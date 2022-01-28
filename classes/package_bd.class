@@ -1,0 +1,760 @@
+<?php
+//require_once "comum/sessao/configsis.inc";
+//classe de generica de conexao com o banco
+class genericDB {
+    // propriedade publicas
+    var $usuario;
+    var $senha;
+    var $banco;
+    var $host;
+    var $base;
+    var $aliasDB;
+
+    // propriedades privadas
+    var $nomeBD;
+    var $connectionid;
+    var $conOK;
+    var $errors;
+    var $rowsAffected;
+    var $commitparameter;
+    var $charset;
+
+    //metodo construtor
+    function genericDB() {
+        $this->conOK = false;
+        $this->commitparameter = 0;
+        //$this->SetAutocommit(true);
+        $this->errors = '';
+        $this->rowsAffected = 0;
+    }
+
+    //metodo que seta o banco para a conexao
+    function setBanco($nome_BD = 'MYSQL') {
+        $nome_BD = strtoupper($nome_BD);
+        switch($nome_BD) {
+           
+            case 'MYSQL': $this->nomeBD = $nome_BD;
+                break;
+            case 'POSTGRES': $this->nomeBD = $nome_BD;
+                break;
+            case 'MATRIX': $this->nomeBD = $nome_BD;
+                break;
+            default:
+                $this->nomeBD = '';
+                $this->errors = "<BR>genericDB::setBanco->Banco de dados inválido ($nome_BD)!<BR>";
+                break;
+        } // switch
+    }
+
+    //metodo que seta as veriaveis para a conexao generica
+    function setConexao($pUsuario, $pSenha, $pBanco = '', $pHost = '') {
+        if ($this->nomeBD == '') {
+            $this->errors = "<BR>genericDB::setConexao->Banco de dados não informado!<BR>";
+        } else {
+            $this->usuario = $pUsuario;
+            $this->senha = $pSenha;
+            $this->banco = $pBanco;
+            $this->host = '';
+            $this->base = '';
+
+            switch($this->nomeBD) {
+                case 'MYSQL':
+                    $this->host = $pHost;
+                    $this->base = $pBanco;
+                    break;
+                case 'POSTGRES':
+                    $this->host = $pHost;
+                    $this->base = $pBanco;
+                    break;
+                case 'MATRIX':
+                    $this->host = $pHost;
+                    $this->base = $pBanco;
+                    break;
+            } // switch
+
+            $this->conOK = true;			
+        }
+    }
+
+    //metodo que seta a condicao de autocommit para o banco
+    function SetAutocommit($condition) {
+        switch($this->nomeBD) {
+        case 'MYSQL':
+        case 'POSTGRES':
+            if($condition == true) {
+                $this->autocommit = true;
+                $this->commitparameter = 1;
+            } else {
+                $this->autocommit = false;
+                $this->commitparameter = 0;
+            }
+            break; 
+		}
+    }
+    
+    //metodo que faz a conexao com o banco
+    function conecta($mostraErro=true) {
+        
+        if ($this->conOK) {		
+            switch($this->nomeBD){
+                
+                case 'MYSQL':				
+                    $this->connectionid = @mysql_connect($this->host, $this->usuario, $this->senha)
+                        or die('<B><CENTER>Sem conexão com o Banco de Dados<BR>'.$host.'</CENTER></B>');
+                    mysql_select_db($this->base, $this->connectionid);
+                    $this->charset = @mysql_client_encoding($this->connectionid);
+                    $this->conOK = true;
+                    break;
+					
+                case 'POSTGRES':
+                    $this->connectionid = @pg_connect("host=".$this->host." user=".$this->usuario." password=".$this->senha." port=5432 dbname=".$this->base."");
+
+                    $this->errors = @pg_last_error($this->connectionid);
+					
+                    if (empty($this->errors)) {
+                        $this->conOK = true;
+                    } else {
+                        $this->conOK = false;
+                    }
+
+                    if ( (!$this->conOK) and ( $mostraErro==true) ) {
+                        echo "<B><CENTER>Sem conexão com o Banco de Dados<BR>".$host."</CENTER></B>";
+                        exit;
+                    }
+
+                    $stat = @pg_connection_status($this->connectionid);
+                    if ($stat === 0) {
+                        if ($this->commitparameter == 0) {
+                            $result = @pg_query($this->connectionid, 'begin;');
+                            if ($result) {
+                                $this->conOK = true;
+                            } else {
+                                $this->conOK = false;
+                            }
+                        } else {
+                            $this->conOK = true;
+                        }
+                    } else {
+                        $this->conOK = false;
+                        $this->errors = "genericDB::conecta->Falha ao conectar c/Postgres!";
+                    }
+                    break;
+                case 'MATRIX':
+                    $this->connectionid = 99999;
+                    break;
+            } // switch
+
+            return $this->connectionid;
+        } else {
+            $this->errors = "<BR>genericDB::conecta->Conexao de Banco não preparada!<BR>";
+            return false;
+        }
+    }
+   
+    //metodo que encerra a conexao com o banco
+    function close(){
+        switch($this->nomeBD){
+            case 'MYSQL':
+                @mysql_close($this->connectionid);
+                break;
+            case 'POSTGRES':
+                @pg_close($this->connectionid);
+                break;
+            case 'MATRIX':
+                //DO NOTHING
+                break;
+        }
+    }
+}
+
+//classe que busca das configuracoes os parametros para a conexao
+/*class confDB extends genericDB {
+    function setBancoByAlias($alias){
+        GLOBAL $SISCONF;
+
+        // var_dump($SISCONF['SESSION']);
+        $this->aliasDB = strtoupper($alias);
+
+        // echo "<BR>this->aliasDB - ".$this->aliasDB."<BR>";
+        $this->nomeBD = strtoupper($SISCONF['DB'][$this->aliasDB]['BANCO']);
+        if(isset($SISCONF['DB'][$this->aliasDB]['SID'])){$this->banco = $SISCONF['DB'][$this->aliasDB]['SID'];}
+        $this->host = $SISCONF['DB'][$this->aliasDB]['HOST'];
+        $this->base = $SISCONF['DB'][$this->aliasDB]['BASE'];
+
+        if (strtoupper($SISCONF['DB'][$this->aliasDB]['USER_CONNECT']) == 'REQUEST'){
+            $this->usuario = $SISCONF['SESSAO']['USUARIO']['USUARIO'];
+            $this->senha = $SISCONF['SESSAO']['USUARIO']['SENHA'];
+        }elseif (strtoupper($SISCONF['DB'][$this->aliasDB]['USER_CONNECT']) == 'DEFAULT'){
+            $this->usuario = $SISCONF['DB'][$this->aliasDB]['USUARIO'];
+            $this->senha = $SISCONF['DB'][$this->aliasDB]['SENHA'];
+        }else{
+            $this->usuario = '';
+            $this->senha = '';
+        }
+
+        $this->SetAutocommit(false);
+        $this->conOK = true;
+        // $this->show();
+        // echo "<BR><BR>";
+    }
+}*/
+
+//classe de query generica
+class genericQuery {
+    var $statement;
+    var $quey;
+    var $connection;
+    var $nomeBD;
+    var $conOK;
+    var $errorCode;
+    var $errors;
+    var $row;
+    var $processoOk;
+    var $rowsAffected;
+    var $rowsSelected;
+    var $lastQuery;
+    var $matrixRowId;   //Utilizado exclusivamente para query com MATRIZES
+    var $commitparameter;
+    var $timer;
+
+    var $tableDef = array();
+
+    //metodo constructor
+    function genericQuery(&$DBObject) {
+        $this->conOK = false;
+        
+		$this->connection = &$DBObject->connectionid;
+	  
+		$this->commitparameter = $DBObject->commitparameter;
+		$this->nomeBD = $DBObject->nomeBD;
+		$this->conOK = $DBObject->conOK;
+    
+        $this->errors = "";
+        $this->processoOk = false;
+        $this->matrixRowId = 0;
+        $this->timer = new timer();
+    }
+
+    //metodo de query
+    /*function query($sql) {
+      
+        GLOBAL $SISCONF;
+        if (!is_array($sql)) {
+            $this->lastQuery = $sql;
+        }
+
+        if ($this->conOK) {
+         
+            $this->timer->start();
+            switch($this->nomeBD){
+          
+                case 'MYSQL':
+                    $teste = @mysql_free_result($this->statement);
+
+                    $this->connection->charset = @mysql_client_encoding($this->connection->connectionid);
+
+                    $this->statement = @mysql_query($sql, $this->connection);
+					
+                    $this->errors = mysql_error($this->connection);
+
+                    $this->rowsAffected = @mysql_affected_rows($this->connection);
+                    $this->rowsSelected = @mysql_num_rows($this->statement);
+                    break;
+
+                case 'POSTGRES':
+                    $this->statement = pg_query($this->connection,$sql);
+                    $this->errors = pg_last_error($this->connection);
+                    $this->rowsAffected = pg_num_rows($this->statement);
+                    $this->rowsSelected = pg_num_rows($this->statement);
+                    break;
+                case 'MATRIX':
+                    if (is_array($sql)) {
+                        $this->statement = $sql;
+                        $this->errors = "";
+                        $this->rowsAffected = 0;
+                        $this->rowsSelected = count($sql) - 1;
+                        $this->matrixRowId = 0;
+                    }
+                    break;
+
+            } 
+
+            $this->timer->stop();
+            $mem = $sql;
+
+            if ($this->nomeBD != 'MATRIX') {
+                $sql = strtoupper($sql);
+                $atual = false;
+                if (!(strpos($sql, "INSERT") === false)) { $atual = true;}
+                if (!(strpos($sql, "UPDATE") === false)) { $atual = true;}
+                if (!(strpos($sql, "DELETE") === false)) { $atual = true;}
+
+                $terros = "";
+                if (($this->rowsAffected < 1) && ($atual == true)) {
+                    $this->errors = "Nenhum registro foi afetado!<BR>".$this->errors;
+                    $terros = $this->errors;
+                    $this->processoOk = false;
+                }else{
+                    $this->processoOk = true;
+                }
+
+                $mem = $mem."<BR>".
+                        "Registros afetados: ".$this->rowsAffected."<BR>".
+                        "Registros selecionados: ".$this->rowsSelected."<BR>".
+                        "<B>$terros</B>".
+                        "<BR><B>Tempo Decorrido: ".$this->timer->total."</B>";
+                memorizeQuery($mem);
+            }
+
+            //return $this->connectionid;
+            return $this->connection;
+
+        }else{
+            $this->errors = "<BR>genericQuery::query: Conexao de Banco não preparada!<BR>";
+            return false;
+        }
+    } */
+
+    //metodo de query para uso com TRANSAÇÃO
+    function TQuery($sql, $breakProgram = true, $programa = ' transação no banco de dados.') {
+        //dump($this->commitparameter,'commitparameter - query');
+        GLOBAL $SISCONF;
+        GLOBAL $PHP_SELF;
+        $retorno = true;
+        $this->lastQuery = $sql;		
+        if ($this->conOK) {		            
+            $this->timer->start();
+            switch($this->nomeBD){
+                
+                case 'MYSQL':
+                    
+                    if ($breakProgram == true) {
+                        $teste = @mysql_free_result($this->statement);
+                        $this->statement = @mysql_query($sql, $this->connection) or die ($this->erroPadrao($this->connection, $programa, $PHP_SELF));
+                    }else{
+                        $teste = @mysql_free_result($this->statement);
+                        $this->statement = @mysql_query($sql, $this->connection);
+
+                        $this->errors = mysql_error($this->connection);
+                    }
+
+					//                  $this->errors = mysql_error($this->connection)."<BR>".mysql_info($this->connection);
+                    $this->rowsAffected = @mysql_affected_rows($this->connection);
+                    $this->rowsSelected = @mysql_num_rows($this->statement);
+                    break;
+
+                case 'POSTGRES':
+                    
+                    //$this->errors =  "genericQuery::query -> Postgres não Implmentado!";
+                    if ($breakProgram == true) {
+                        $this->statement = @pg_query($this->connection,$sql) or die ($this->erroPadrao($this->connection, $programa, $PHP_SELF));
+                    } else {
+                        $this->statement = @pg_query($this->connection,$sql);
+                    }
+                    $this->rowsAffected = @pg_affected_rows($this->statement);
+                    $this->rowsSelected = @pg_num_rows($this->statement);
+                    $this->errors = @pg_result_error($this->statement);
+					if ($this->errors=="") {
+						$this->errors .= pg_last_error($this->connection);
+					}
+                    break;
+                case 'MATRIX':
+                    if (is_array($sql)) {
+                        $this->statement = $sql;
+                        $this->errors = "";
+                        $this->rowsAffected = 0;
+                        $this->rowsSelected = count($sql) - 1;
+                        $this->matrixRowId = 0;
+                    }
+                    break;
+            }
+
+            $this->timer->stop();
+            $mem = $sql;
+
+            if ($this->nomeBD != 'MATRIX') {
+                $sql = strtoupper($sql);
+                $atual = false;
+                if (!(strpos($sql, "INSERT") === false)) { $atual = true;}
+                if (!(strpos($sql, "UPDATE") === false)) { $atual = true;}
+                if (!(strpos($sql, "DELETE") === false)) { $atual = true;}
+
+                $terros = "";
+                if (($this->rowsAffected < 1) && ($atual == true)) {
+                    $this->errors = "Nenhum registro foi afetado!<BR>".$this->errors;
+                    $terros = $this->errors;
+
+                    $this->processoOk = false;
+                }else{
+                    $this->processoOk = true;
+                }                
+            }
+            return $retorno;			
+
+        }else{
+            $this->errors = "<BR>genericQuery::query: Conexao de Banco não preparada!<BR>";
+            return false;
+        }
+    }
+
+	function erroPadrao(&$objeto, $operacao, $link) {
+        //FGormata a mensagem de erro padrão
+
+        $mensagem = "";
+
+        if ($this->conOK) {
+            // echo "this->connection =".$this->connection."<BR>";
+            switch($this->nomeBD){
+                case 'ORACLE':
+                    if ($objeto == '') {
+                        $erro = ocierror();
+                    } else {
+                        $erro = ocierror($objeto);
+                    }
+                    break;
+                case 'MYSQL':
+                    echo "</pre>";
+                        $erro['code'] = mysql_errno($objeto);
+                        $erro['message'] = mysql_error($objeto);
+                        $erro['sqltext'] = $this->lastQuery;
+                    break;
+                case 'POSTGRES':
+                        $erro['code'] = "";
+                        $erro['message'] = @pg_last_error($objeto);
+                        $erro['sqltext'] = $this->lastQuery;
+                    break;
+                // case 'MYSQL':
+                        // $erro['code'] = "";
+                        // $erro['message'] = "";
+                        // $erro['sqltext'] = "";
+                    // break;
+            } 
+        }
+
+        $codigo = $erro['code'];
+        $mensagem = $erro['message']." [offset ".$erro."]";
+        $instrucao = $erro['sqltext'];
+        $bgcor = " STYLE =\"{background:#A0A0A0}\" ";
+        $bgcor2 = " STYLE =\"{background:#f9f9f9}\" ";        
+
+        $out = "<TABLE BORDER=0 $bgcor ALIGN=CENTER WIDTH=450>";
+        $out .= "<TR><TD ALIGN=CENTER COLSPAN=3 $bgcor><FONT SIZE=5>Mensagem de Erro</FONT></TD></TR>";
+        $out .= "<TR><TD ALIGN=CENTER COLSPAN=3 $bgcor2><FONT SIZE=4>Ocorreu um erro durante a execução da $operacao</FONT></TD></TR>";
+
+            $out .= "<TR><TD ALIGN=CENTER ROWSPAN=4 $bgcor><B><FONT SIZE=3>
+            <P>E<BR>R<BR>R<BR>O</P>
+            </FONT></B></TD>";
+            $out .= "".
+                "<TD ALIGN=RIGHT VALIGN=TOP $bgcor2><FONT SIZE=2><B>Código</B></FONT></TD>".
+                "<TD ALIGN=LEFT VALIGN=TOP $bgcor2><FONT SIZE=2>$codigo</FONT></TD>".
+                "</TR>";
+            $out .= "<TR>".
+                "<TD ALIGN=RIGHT VALIGN=TOP $bgcor2><FONT SIZE=2><B>Mensagem</B></FONT></TD>".
+                "<TD ALIGN=LEFT VALIGN=TOP $bgcor2><FONT SIZE=2>$mensagem</FONT></TD>".
+                "</TR>";
+            $out .= "<TR>";
+            $out .= "<TD ALIGN=RIGHT VALIGN=TOP $bgcor2><FONT SIZE=2><B>Instrução</B></FONT></TD>".
+                    "<TD ALIGN=LEFT VALIGN=TOP $bgcor2>";
+					
+			$str_e = "";
+			foreach($erro as $k => $v){
+				$str_e .= "[$k] = $v <BR>";
+			}
+			$out .= "<FONT SIZE=2>$str_e<HR>$instrucao</FONT>";
+
+            $out .= "</TD></TR>";
+            $out .= "<TR>".
+                "<TD ALIGN=CENTER COLSPAN=2 VALIGN=TOP $bgcor2><FONT SIZE=2><B>Aviso: Transação desfeita.</B></FONT></TD>".
+                "</TR>";
+        $out .= "<TR><TD ALIGN=CENTER COLSPAN=3 $bgcor2><FONT SIZE=3><A HREF='$link'><B>Clique aqui para voltar</B></A></FONT></TD></TR>";
+
+        $out .= "</TABLE>";
+
+        echo $out;
+        
+        $this->rollback();
+
+        exit;
+    }
+		
+    function commit(){
+        if ($this->conOK) {
+            switch($this->nomeBD){
+                
+                case 'MYSQL':
+                    $this->errors = "genericQuery::commit->MySQL não Implmentado!";
+                    break;
+                case 'POSTGRES':
+                    if ($this->commitparameter == 0) {
+                        $result = @pg_query($this->connection, 'commit;');
+                        if ($result) {
+                            $result = @pg_query($this->connection, 'begin;');
+                            return true;
+                        } else {
+                            $error = @pg_last_error($this->connection);
+                            $this->errors = "genericQuery::commit->Falha ao tentar Commit. [Postgres reports]: " . $error;
+                            return false;
+                        }
+                    } else {
+                        $error = @pg_last_error($this->connection);
+                        $this->errors = "A transação estava setada para autocommit!";
+                        return false;
+                    }
+                    break;
+                case 'MATRIX':
+                    
+                    break;
+            } 
+
+            $mem = " <B>Comitando a Transação</B>";
+            //memorizeQuery($mem);
+        }else{
+            $this->errors = "<BR>genericQuery::commit: Conexao de Banco não preparada!<BR>";
+            return false;
+        }
+    }
+
+    function rollback(){
+        if ($this->conOK) {
+            switch($this->nomeBD){
+              
+                case 'MYSQL':
+                   $result = @mysql_query($this->connection, 'rollback;');
+                        if ($result) {
+                            $result = @mysql_query($this->connection, 'start;');
+                            return true;
+                        } else {
+                            $error = @pg_last_error($this->connection);
+                            $this->errors = "genericQuery::commit->Falha ao tentar Rollback. [myslq reports]: " . $error;
+                            return false;
+                        }
+                case 'POSTGRES':
+                    if ($this->commitparameter == 0) {
+                        $result = @pg_query($this->connection, 'rollback;');
+                        if ($result) {
+                            $result = @pg_query($this->connection, 'begin;');
+                            return true;
+                        } else {
+                            $error = @pg_last_error($this->connection);
+                            $this->errors = "genericQuery::commit->Falha ao tentar Rollback. [Postgres reports]: " . $error;
+                            return false;
+                        }
+                    } else {
+                        $error = @pg_last_error($this->connection);
+                        $this->errors = "A transação estava setada para autocommit!";
+                        return false;
+                    }
+                    break;
+                case 'MATRIX':
+                    
+                    break;
+            } 
+
+            $mem = " <B>Rollback da Transação</B>";
+            memorizeQuery($mem);
+        }else{
+            $this->errors = "<BR>genericQuery::rollback: Conexao de Banco não preparada!<BR>";
+            return false;
+        }
+    }
+
+    function free(){
+        if ($this->conOK) {
+           
+            switch($this->nomeBD){             
+                case 'MYSQL':
+                    $teste = @mysql_free_result($this->statement);
+                    $this->statement = null;
+                    $this->row = null;
+                    break;
+                case 'POSTGRES':
+                    $teste = @pg_free_result($this->statement);
+                    $this->statement = null;
+                    $this->row = null;
+                    break;
+                case 'MATRIX':
+                    $this->statement = null;
+                    $this->row = null;
+                    break;
+            } 
+        }else{
+            $this->errors = "<BR>genericQuery::free: Conexao de Banco não preparada!<BR>";
+            return false;
+        }
+    }
+
+    //metodo de fetchrow
+    function fetchrow($mode = 'CASEUPPER') {
+        $this->rowsAffected = 0;
+        if ($this->conOK){
+            $results = array();
+
+            switch($this->nomeBD) {             
+                case 'MYSQL':
+                    $results = @mysql_fetch_array($this->statement);
+                    $this->errors = mysql_error($this->connection);
+                    $this->row = $results;
+                    break;
+					
+                case 'POSTGRES':
+				
+                    $results = @pg_fetch_assoc($this->statement);
+                    $this->errors = @pg_result_error($this->statement);
+
+                    if ((is_array($results)) and ($mode == 'CASEUPPER')) {
+                        $results = array_change_key_case($results, CASE_UPPER);
+                    }
+                    $this->row = $results;
+                    break;
+					
+                case 'MATRIX':
+                    $this->matrixRowId++;   //Linha 0 é a do nome dos campos
+                                            //a partir da 1 é campos
+                    if ($this->matrixRowId >= count($this->statement)) {                
+                        return false;
+                    }
+                    $fieldNames  = $this->statement[0];
+                    $fieldValues = $this->statement[$this->matrixRowId];
+                    $results = array();
+                    for ($stm = 0; $stm < count($fieldNames); $stm++){
+                        $fn = strtoupper($fieldNames[$stm]);
+                        $results[$fn] = $fieldValues[$stm];
+                    }
+                    $this->row = $results;
+                    break;
+            }
+            return $results;
+        }else{
+            return false;
+        }
+    }
+
+    //metodo de fetchall
+    //Retorna todas as linhas odo resultado para um array
+    //function fetchall($mode = 'CASEUPPER') {
+    function fetchall($style='ROW',$mode = 'CASEUPPER') {
+        $this->rowsAffected = 0;
+        if ($this->conOK){
+            $results = array();
+
+            switch($this->nomeBD) {
+             
+                case 'MYSQL':
+                    $results = @mysql_fetch_array($this->statement);
+                    $this->errors = mysql_error($this->connection);
+
+                    if ((is_array($results)) and ($mode == 'CASEUPPER')) {
+                        $results = array_change_key_case($results, CASE_UPPER);
+                    }
+
+                    $this->row = $results;
+                    break;
+					
+                case 'POSTGRES':
+                    $results = @pg_fetch_all($this->statement);
+                    $this->errors = @pg_result_error($this->statement);
+
+                    if ((is_array($results)) and ($mode == 'CASEUPPER')) {
+                        foreach($results as $chave => $dados) {
+                            $dados = array_change_key_case($dados, CASE_UPPER);
+                            $results[$chave] = $dados;
+                        }
+                    }
+
+                    $this->row = $results;
+                    break;
+
+                case 'MATRIX':
+                    $this->matrixRowId++;   //Linha 0 é a do nome dos campos
+                                            //a partir da 1 é campos
+                    if ($this->matrixRowId >= count($this->statement)) {
+                        //Chegou ao fim da Matriz
+                        return false;
+                    }
+                    $fieldNames  = $this->statement[0];
+                    $fieldValues = $this->statement[$this->matrixRowId];
+                    $results = array();
+                    for ($stm = 0; $stm < count($fieldNames); $stm++){
+                        $fn = strtoupper($fieldNames[$stm]);
+                        $results[$fn] = $fieldValues[$stm];
+                    }
+                    $this->row = $results;
+                    break;
+            }
+            return $results;
+        }else{
+            return false;
+        }
+    }
+
+
+    //metodo de countrows
+    function countrows(){
+        switch($this->nomeBD){
+            case 'MYSQL':
+                $rows = mysql_num_rows($this->statement);
+                break;
+            case 'POSTGRES':
+                $rows = @pg_num_rows($this->statement);
+                break;
+            case 'MATRIX':
+                $rows = count($this->statement) - 1;
+                break;
+        }
+        return $rows;
+    }
+
+    //metodo de checkerros
+    function checkerrors() {
+        $tmp = false;
+        switch($this->nomeBD){
+           
+            case 'MYSQL':
+                if ($this->errors != ''){
+                    $tmp = $this->errors;
+                    $tmp = "<TABLE ALIGN=CENTER BORDER=2 WIDTH=250><tr><td>$tmp</td></tr></TABLE>";
+                }
+                break;
+            case 'POSTGRES':
+                if ( $this->errors != '' ) {
+                    $tmp = $this->errors;
+                    $tmp = "<TABLE ALIGN=CENTER BORDER=2 WIDTH=250><tr><td>$tmp</td></tr></TABLE>";
+                }
+                break;
+            case 'MATRIX':
+                if ($this->errors != ''){
+                    $tmp = $this->errors;
+                    $tmp = "<TABLE ALIGN=CENTER BORDER=2 WIDTH=250><tr><td>$tmp</td></tr></TABLE>";
+                }
+                break;
+        }
+        return $tmp;
+    }    
+}
+
+// classe que retorna o tempo de execucao de um script
+class timer{
+
+    var $start;
+    var $stop;
+    var $total;
+
+    // metodo que retorna o time do start
+    function timer(){
+    }
+    // metodo que retorna o time do start
+    function start(){
+         $micro = explode(" ", microtime()); // busca a data
+         $this->start = $micro[1] + $micro[0]; // calcula o valor
+         return $this->start;
+    }
+    // metodo que retorna o time do stop
+    function stop(){
+         $micro = explode(" ", microtime()); // busca a data
+         $this->stop = $micro[1] + $micro[0]; // calcula o valor
+         $this->total = $this->stop - $this->start;
+         return $this->total;
+    }
+}
+
+?>

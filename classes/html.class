@@ -1,0 +1,59 @@
+<?PHP
+
+//require_once "default.css";
+
+/*##############################################################
+# PROGRAMA:
+# DATA CRIA��O:
+# PROGRAMADOR:  Alexsandro Corrêa
+# ARQUIVO DO PROGRAMA:
+#
+#
+# CLASSES RELACIONADAS
+#  ->
+# Hist�rico de Manuten��es:
+# Data:     
+##############################################################*/
+
+class html
+{	
+	function getCabecalhoHtml($title = 'OCOMON 2.0 - RC6.1',$bgColor='',$js="",$css='',$backGround='')
+	{	
+		$html=""
+				."\n <html>"
+				."\n<head>"
+				."\n <META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html charset=iso-8859-1\">  "
+					."\n<title>OCOMON 2.0 - RC6.1</title>";
+		if($css !=""){
+			for( $i=0; $i <count($css); $i++) {
+				$html.="<link rel='stylesheet' href='".$css[$i]."' type=\"text/css\">";				
+			}
+		}
+		if($js !="") {
+			for( $i=0; $i <count($js); $i++) {
+				$html.="\n<script language='JavaScript' src='".$js[$i]."' type='text/javascript'></script>";
+			}			
+		}
+		$html.="<script type='text/javascript' language='javascript1.1' src='js/funcoes.js';></script>";
+		$html.="<script language='javascript1.1'>setaFocusFirstElement();</script>";
+		$html.="</head>";
+		
+		if((trim($bgColor) != '') or (trim($backGround) != '')){
+			$html.="\n <body bgcolor='".$bgColor."' background='".$backGround."' onLoad='setaFocusFirstElement();'>";
+		}else{
+			$html.="\n <body class=\"plano_de_fundo\" onLoad='setaFocusFirstElement();'>";					
+		}				
+		
+		echo $html;
+	}
+
+	function getEndHtml()
+	{
+		$html = "";
+		$html.="  </body>"
+		   ."\n</html>";
+		echo $html;
+	}
+}
+
+?>

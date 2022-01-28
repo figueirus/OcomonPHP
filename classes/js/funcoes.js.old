@@ -1,0 +1,155 @@
+
+/**
+*atualizaDiv 
+*
+*php_self -> poagina atual
+*acao ->acao onde o programa pegar o que deve ser imprimido na div
+* divName -> nome da div ...
+* arrayVars -> continuação do link da pagina com seus respectivos valores e variaveis a mais ...
+*/
+function atualizaDiv ( php_self, acao ,divName, arrayVars) 
+{
+	if(arrayVars == undefined){
+		var link = '';
+	} else {
+		var link = arrayVars; 
+	}
+	
+	var div = document.getElementById(divName);
+	if (acao == '') {
+		var url = php_self + link;	
+	} else {
+		var url = php_self + '?acao=' + acao + link;	
+	}
+    
+	//ajaxGet( url, div, false );
+    get( url, div );
+}
+
+function atualizaFoto ( php_self, acao ) {
+	var div = document.getElementById( 'foto_interna' );
+	var url = php_self + '?acao=' + acao; 
+	//alert(url);
+	//ajaxGet( url, div, false );
+	get( url, div );
+}
+
+function atualizaAdmin ( php_self, acao ) {
+	var div = document.getElementById( 'corpo' );
+	var url = php_self + '?acao=' + acao; 
+	//alert(url);
+	//ajaxGet( url, div, false );
+	get( url, div );
+}
+
+function alterarEstilo( opcao ) 
+{
+	var div = document.getElementById( 'interna' );
+	switch ( opcao ) {
+	case 'esconder':		
+		div.style.display = 'none';
+		break;
+		
+	case 'mostrar':
+		div.style.display = 'inline';
+		break;
+	}
+	
+}
+
+function alteraValorPagina ( valor ) 
+{	
+	var obj = document.getElementById( 'foto' ); 
+	var div = document.getElementById( 'interna' );
+	div.innerHTML = '<img src=\"'+valor+'\" alt=\"\" onclick=\"alterarEstilo( \'esconder\' );\" />';	
+	//alert(div.innerHTML);
+}
+
+function setaFocusFirstElement()
+{
+	sair = '0';
+	for (indice=0; indice<document.forms.length; indice++) {
+		for (i=0; i<document.forms[indice].elements.length; i++) {
+			if ((document.forms[indice].elements[i].type == 'radio') && (document.forms[indice].elements[i].value == ''))     {
+				if (document.forms[indice].elements[i].disabled == false) {
+					setTimeout('document.forms[indice].elements[i].focus()', 500);
+					sair = '1';
+					break;
+				}
+			}
+
+			if ((document.forms[indice].elements[i].type == 'text')&& (document.forms[indice].elements[i].value == '')) {
+				if (document.forms[indice].elements[i].disabled ==false) {
+					if (document.forms[indice].elements[i].readOnly== false) {
+						setTimeout('document.forms[indice].elements[i].focus()', 500);
+						sair = '1';
+						break;
+					}
+				}
+			}
+
+			if ((document.forms[indice].elements[i].type == 'textarea') && (document.forms[indice].elements[i].value == '')) {
+				if (document.forms[indice].elements[i].disabled == false) {
+					if (document.forms[indice].elements[i].readOnly== false) {
+						setTimeout('document.forms[indice].elements[i].focus()', 500);
+						sair = '1';
+						break;
+					}
+				}
+			}
+
+			if ((document.forms[indice].elements[i].type == 'checkbox') && (document.forms[indice].elements[i].value == '')) {
+				if (document.forms[indice].elements[i].disabled == false) {
+					setTimeout('document.forms[indice].elements[i].focus()', 500);
+					sair = '1';
+					break;
+				}
+			}
+
+			if ((document.forms[indice].elements[i].type == 'select-one') && (document.forms[indice].elements[i].value == '')) {
+				if (document.forms[indice].elements[i].disabled == false) {
+						setTimeout('document.forms[indice].elements[i].focus()', 500);
+					sair = '1';
+					break;
+				}
+			}
+		}
+		if (sair == '1') {
+			break;
+		}
+	}
+}
+
+function writeToday(formName, elementName, nextElement) 
+{
+	var tmpObj = eval('document.' +formName+ '.' +elementName);
+	if (tmpObj.value == '') {
+		var today = new Date(); 
+		var tmpDay =  String(today.getDate()); 
+		var tmpMonth = String(today.getMonth()+ 1);  
+		var tmpYear = String(today.getFullYear());  
+		tmpDay  = ((tmpDay.length==1)? '0':'')  + String(tmpDay); 
+		tmpMonth = ((tmpMonth.length==1)? '0':'') +  String(tmpMonth); 
+		var tmpDate = tmpDay + tmpMonth + tmpYear; 
+		tmpObj.value = tmpDate;
+	} else { 
+		return; 
+	}
+}
+
+function NewWindow(myPage, myName, Width, Height, Scroll, Resizable) {
+	var winTop = ((screen.height - Height) / 2);
+	var winLeft= ((screen.width - Width) / 2); 
+	winProps = 'top=' +winTop+ ',left=' +winLeft+ ',height=' +Height+ ',width=' +Width+ ',Scrollbars=' +Scroll+ ',Resizable=' +Resizable;
+	Win = window.open(myPage, myName, winProps); 
+		if (parseInt(navigator.appVersion) >= 4) {  
+			Win.window.focus(); //set focus to the window 
+		}
+		function CloseCalandar()  
+		{ 
+			try { 
+				Win.close(); 
+			} catch(e) {} 
+		} 
+		
+}

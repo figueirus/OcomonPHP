@@ -1,0 +1,285 @@
+<?php
+
+	require_once "../../includes/include_geral.inc.php";
+	require_once "../../includes/include_geral_II.inc.php";
+
+/*##############################################################
+# class getElement
+# DATA CRIAÇÃO: 
+# PROGRAMADOR: Alexsandro Corrêa
+# ARQUIVO DO PROGRAMA: getElement.php
+##############################################################*/
+
+	class getElement
+	{
+		function getCombo($nome, $valor, $dados, $js, $selecione, $bloqueia=false)
+		{
+			$html = "<select class='select' name='$nome' id='i_$nome' value='$valor' $js ".($bloqueia===true?'disabled':'').">";
+			if (trim($selecione) != "") {
+				$html .= "<option value=''>".$selecione."</option>";	
+			}
+			if(count($dados) > 0) {
+				foreach ($dados as $ch => $value) {	
+					$html .= "<option value='$ch' ".($valor==$ch?'selected':'').">$value</option>";
+				}
+			}	
+			$html .= "</select>";
+			return $html;
+		}
+		
+		function getComboMes($nome, $valor, $js, $selecione ,$bloqueia=false)
+		{
+			$html = "<select class='select'name='$nome' id='i_$nome' value='$valor' $js ".($bloqueia===true?'disabled':'')." style='{width:100px;height:16px;}'>";
+	
+			if (trim($selecione) != "") {
+				$html .= "<option value=''>".$selecione."</option>";	
+			} else {
+				$html .= "<option value=''>Mês</option>";	
+			}
+			
+			$dados = array();
+			$dados[1] = "Janeiro";
+			$dados[2] = "Fevereiro";
+			$dados[3] = "Março";
+			$dados[4] = "Abril";
+			$dados[5] = "Maio";
+			$dados[6] = "Junho";
+			$dados[7] = "Julho";
+			$dados[8] = "Agosto";
+			$dados[9] = "Setembro";
+			$dados[10] = "Outubro";
+			$dados[11] = "Novembro";
+			$dados[12] = "Dezembro";
+			
+			if(count($dados) > 0) {
+				foreach ($dados as $ch => $value) {	
+					$html .= "<option value='$ch' ".($valor==$ch?'selected':'').">$value</option>";
+				}
+			}	
+			$html .= "</select>";
+			return $html;
+		}
+		
+		function getComboDia($nome, $valor, $js,$selecione ,$bloqueia=false)
+		{
+			$html = "<select class='select' name='$nome' id='i_$nome'' value='$valor' $js ".($bloqueia===true?'disabled':'')." style='{width:50px;height:16px;}'>";
+			
+		if (trim($selecione) != "") {
+			$html .= "<option value=''>".$selecione."</option>";	
+		} else {
+			$html .= "<option value=''>Dia</option>";	
+		}			
+			$dados = array();
+			$dados[1] = 1;
+			$dados[2] = 2;
+			$dados[3] = 3;
+			$dados[4] = 4;
+			$dados[5] = 5;
+			$dados[6] = 6;
+			$dados[7] = 7;
+			$dados[8] = 8;
+			$dados[9] = 9;
+			$dados[10] = 10;
+			$dados[11] = 11;
+			$dados[12] = 12;
+			$dados[13] = 13;
+			$dados[14] = 14;
+			$dados[15] = 15;
+			$dados[16] = 16;
+			$dados[17] = 17;
+			$dados[18] = 18;
+			$dados[19] = 19;
+			$dados[20] = 20;
+			$dados[21] = 21;
+			$dados[22] = 22;
+			$dados[23] = 23;
+			$dados[24] = 24;
+			$dados[25] = 25;
+			$dados[26] = 26;
+			$dados[27] = 27;
+			$dados[28] = 28;
+			$dados[29] = 29;
+			$dados[30] = 30;
+			$dados[31] = 31;
+			
+			if(count($dados) > 0) {
+				foreach ($dados as $ch => $value) {	
+					$html .= "<option value='$ch' ".($valor==$ch?'selected':'').">$value</option>";
+				}
+			}	
+			$html .= "</select>";
+			return $html;
+		}
+		
+		function getComboAno($nome, $valor, $js, $selecione ,$bloqueia=false, $anoInicioAtual = false)
+		{
+			if($anoInicioAtual == true) {
+				$valor = date('Y')+3;
+			}
+			$html = "<select class='select' name='$nome' id='i_$nome' value='$valor' $js ".($bloqueia==true?'disabled':'')." style='{width:60px;height:16px;}'>";
+			
+			$html .= "<option value=''>Ano</option>";	
+			
+			$dados = array();
+			for($i=date('Y')+5;$i>1990;$i--) {
+				$dados[$i] = $i;
+			}
+			
+			if(count($dados) > 0) {
+				foreach ($dados as $ch => $value) {	
+					$html .= "<option value='$ch' ".($valor==$ch?'selected':'').">$value</option>";
+				}
+			}	
+			$html .= "</select>";
+			return $html;
+		}
+		
+		function getText($nome, $valor, $tamanho, $tamanhMaximo, $bloqueia=false, $js='')
+		{	
+			$html = "<input type='text' class='text' id='i_$nome' name='$nome' value=\"".$valor."\" maxlength='".$tamanhMaximo."' size='".$tamanho."' ".($bloqueia==true?'disabled':'')." ".$js."/>";
+			return $html;
+		}
+		
+		function getHidden($nome, $valor)
+		{	
+			$html = "<input type='hidden' id='i_$nome' name='$nome' value=\"".$valor."\" />";
+			return $html;
+		}
+		
+		//function getDateCalendar($nome, $valor, $tamanhMaximo, $bloqueia=false, $js='')
+		function getDateCalendar($nome, $valor, $tamanhMaximo)
+		{	
+			$html = "<INPUT type='text' name='$nome' value='$valor' class='data' id='i_$nome' maxlength='$tamanhMaximo' onkeyup='barra(this)'><a onclick=\"displayCalendar(document.forms[0].$nome,'dd/mm/yyyy',this)\"> "
+				." <img src='../../includes/javascript/img/cal.gif' width='16' height='16' border='0'></a>";
+			//$html = "<input type='text' class='data' id='i_$nome' name='$nome' value=\"".$valor."\" maxlength='".$tamanhMaximo."' ".$js."  ".($bloqueia==true?'disabled':'')."/>";
+			return $html;
+		}
+		
+		function getTextPsw($nome, $valor, $tamanho, $tamanhMaximo, $bloqueia=false)
+		{	
+			$html = "<input class='text' type='password' id='i_$nome' name='$nome' value=\"".$valor."\" maxlength='$tamanhMaximo' size='$tamanho'  ".($bloqueia===true?'disabled':'')."/>";
+			return $html;
+		}        
+        
+		function getTextData($nome, $valor, $bloqueia=false, $nomeForm, $js="")
+		{											
+			echo "<script type='text/javascript' language='javascript1.1' src='js/funcoes.js'></script>";
+			
+			GLOBAL $PHP_SELF;
+			$PHP_SELF = $_SERVER["SCRIPT_NAME"];
+	
+			$onclick = "";
+			if ($bloqueia === false) {
+				$onclick = "onclick=\"NewWindow('calendar.php?frmName=".$nomeForm."&fieldName=".$nome."&nextFieldName=','Datum','229','205','noscrollbars','yes','noresize');\"";			
+				$block = "readonly ";
+			} else {
+				$block = "disabled";
+			}
+					
+			$html = "<table>";
+			$html .= "	<tr>";
+			$html .= "		<td>";
+			$html .= "			<input class='textArea' type=\"text\" id=\"i_$nome\" name=\"$nome\" value=\"$valor\" $js maxlength='10' size='10' ".$block." />";
+			$html .= "		</td>";
+			$html .= "		<td widht='0'>";
+			$html .= "			<a ".$onclick." style='{cursor:pointer;}'><img src='fotos/cal.gif'></a>";
+			$html .= "		</td>";
+			$html .= "	</tr>";
+			$html .= "</table>";
+			
+			return $html;
+		}
+		
+		function getTextArea($nome, $valor, $colunas=38, $linhas=10, $bloqueia=false)
+		{
+			$html = "<textArea name='".$nome."' cols='".$colunas."' rows='".$linhas."' id='i_$nome' ".($bloqueia==true?'disabled':'').">".$valor."</textarea>";
+			return $html;
+		}
+
+		function getRadio($nome, $valor, $js, $checked=false, $disable = false)
+		{
+			$html = "<input name='".$nome."' type='radio' value='".$valor."' ".$js." ".($checked===true?'checked':'')."";
+			
+			if($disable==true){
+				$html .=" DISABLED=\"".$disable."\"";	
+			}				
+			$html .="/>";
+			
+			
+			return $html;
+		}
+        
+        function getCheck($nome, $valor, $js, $checked=false, $disable = false)
+        {
+		$html = "<input name='".$nome."' id='i_".$nome."' type='checkbox' value=".$valor." ".$js." ".($checked==$valor?'checked':'')." disable=\"".$disable."\" />";       
+		return $html;
+        }
+             
+        function getTextValor($name = '', $value='', $color="", $js='', $size=10, $maxLength=10, $disable=true, $align='left')
+	{
+		$this->size = $size;
+		$this->js = $js;
+			if($disable == true) {
+				$this->disabled = 'disabled';
+			} else {
+				$this->disabled = '';
+			}
+			
+			$bgcolor = trim($color);
+		$this->id = "i_".$name;
+		$this->name = $name;
+		$this->maxLength = $maxLength;
+		$this->_align = $align;
+		$this->value = $value;
+		
+		$html ="<input id=\"".$this->id."\"  name=\"".$this->name."\"  type=\"text\"  value=\"".htmlentities($this->value)."\"";
+		$html.="    size=\"".$this->size."\"  maxlength=\"".$this->maxLength."\" class='text' ".$this->disabled."  onKeyUp=\"formataValor(this);\" ".$this->js."  STYLE='{text-align: ".$this->_align."; ".$bgcolor.";}' />";                   
+            
+            return $html;
+        }
+		
+		function selectMultiplo($nome,$valor, $dados,$dados2, $js, $form)
+		{
+			echo "<script type='text/javascript' language='javascript1.1' src='js/listBox.js'></script>";
+									
+			$html = '<table>
+						<tr>
+							<td>
+								<select multiple size="5" name="'.$nome.'selecionar" style="width:150" onClick="move(\''.$form.'\',\''.$nome.'selecionar\',\''.$nome.'selecionados[]\')">
+								 <option value="todos">Todos »</option>';
+			foreach($dados  as $chave => $valorCombo) {
+				$html .='<option value="'.$chave.'">'.$valorCombo.'</option>';
+			}                             
+			$html .='	</select>
+					</td>';
+			
+			$html .= '<td>
+						<select multiple size="5" id="i_'.$nome.'selecionados" name="'.$nome.'selecionados[]" style="width:150" onClick="move(\''.$form.'\',\''.$nome.'selecionados[]\',\''.$nome.'selecionar\')">
+						<option value="todos">« Todos</option>';
+			foreach($dados2  as $chave2 => $valorCombo2) {
+				$html .='<option value="'.$chave2.'">'.$valorCombo2.'</option>';
+			}                             
+			$html .='	</select>
+					</td>
+				</tr>
+			</table>';
+			
+			echo "<script language='javaScript'>
+					function marcaElementos()
+					{
+						elemento = document.getElementById('i_".$nome."selecionados');						
+						arrayElementos = new Array();
+						var tamanho = elemento.length;						
+						for(i=0; i<tamanho; i++) {						
+						  if( elemento.options[i].value != 'todos') {
+							elemento.options[i].selected = true;
+						  }
+						}	
+					}
+				</script>";
+			
+			return $html;
+		}
+		
+	}
+?>

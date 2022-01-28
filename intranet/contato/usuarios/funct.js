@@ -1,0 +1,3 @@
+function checkPass(){
+	alert("QWEQWEQWEQWEQWE");
+}

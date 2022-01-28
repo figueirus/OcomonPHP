@@ -1,0 +1,45 @@
+<?PHP
+
+class forms
+{
+	var $htmlForm;
+
+	function forms($action = '',$name = 'default')
+	{
+		GLOBAL $PHP_SELF;
+	
+		if($action !='') {
+			$actionPost = $action;
+		} else {
+			$actionPost = $PHP_SELF;
+		}
+		
+		$this->htmlForm = "<FORM METHOD='POST' action='".$actionPost."' name='".$name."'>
+							<table>
+								<tr>";
+	
+	}
+	
+	function addComponente($componente = '')
+	{
+		$this->htmlForm.= "<td>".$componente."</td>";	
+	}
+	
+	function addNovoComponente($componente = '')
+	{
+		$this->htmlForm.= "</tr>
+							<tr>
+								<td>".$componente."</td>";	
+	}
+	
+	function geraForm()
+	{
+		$this->htmlForm.="		</tr>
+							</table>
+						</form>";	
+		echo $this->htmlForm;
+	}
+}
+
+
+?>

@@ -1,0 +1,2428 @@
+<?php
+require_once "negocio/comum/package_curso_uni.class";
+require_once "negocio/comum/package_semestre.class";
+require_once "comum/tela/package_form.class";
+require_once "comum/banco/package_bd.class";
+require_once "negocio/comum/negRubricas.class";
+//require_once "negocio/proc_selecao/negProcessoSelecao.class"; --Não PODE FAZER ISTO AQUI
+//require_once "negocio/pessoas/negTitulacao.class";--Não PODE FAZER ISTO AQUI
+
+// Package de objetos basicos de formularios
+// Programador: Jader
+// Data : 15/01/2003
+
+/*
+ * Classe que permite a montagem de um lista de opcoes a partir de um SQL
+ * em um banco de dados.
+ */
+class DBComboBox extends ComboBox {
+    var $descriptor = "function DBComboBox(&\$DB, \$name, \$value)";
+    var $conn;              // Conexao com o banco de dados.
+    var $keyColumn;         // Nome da coluna que sera a chave.
+    var $valueColumn;       // Nome da coluna que sera o valoe.
+    var $sql;               // Sql para buscar os itens.
+    var $value;             // Item selecionado.
+
+    var $useCustomItem;     // Identifica se sera inserido um item personalizado
+                            // como primeiro item da combo.
+    var $customItemKey;     //
+    var $customItemValue;   //
+
+    // Constutor.
+    function DBComboBox(&$DB, $name, $value) {
+        $this->conn = &$DB;
+
+        $this->name = $name;
+        $this->setValue( $value );
+        $this->setSQL( "" );
+        $this->setKeyColumn( "" );
+
+        $this->setUseCustomItem( false );
+        $this->setCustomItemKey( -1 );
+        $this->setCustomItemValue( "" );
+    }
+
+    // Propriedade SQL.
+    function setSQL( $sql ) { $this->sql = $sql; }
+    function getSQL() { return $this->sql; }
+
+    // Propriedade KeyColumn.
+    function setKeyColumn( $column ) { $this->keyColumn = $column; }
+    function getKeyColumn() { return $this->keyColumn; }
+
+    // Propriedade ValueColumn.
+    function setValueColumn( $column ) { $this->valueColumn = $column; }
+    function getValueColumn() { return $this->valueColumn; }
+
+    // Propriedade UseCustomItem.
+    function setUseCustomItem( $value ) { $this->useCustomItem = $value; }
+    function getUseCustomItem() { return $this->useCustomItem; }
+
+    // Propriedade CustomItemKey.
+    function setCustomItemKey( $value ) { $this->customItemKey = $value; }
+    function getCustomItemKey() { return $this->customItemKey; }
+
+    // Propriedade CustomItemValue.
+    function setCustomItemValue( $value ) { $this->customItemValue = $value; }
+    function getCustomItemValue() { return $this->customItemValue; }
+
+    // Propriedade value - Item selecionado.
+    function setValue( $value ) { $this->value = "X" . $value; }
+    function getValue() { return substr($this->value, 1); }
+
+    // Retorna um item especifico da combo.
+    function getItem( $key ) { return $this->options["X" . $key]; }
+
+    // Monta a lista de items.
+    function build() {
+        $query =  new genericQuery( $this->conn );
+
+        $sql = $this->getSQL();
+        $query->TQuery( $sql );
+
+        $retval = array();
+
+        // Adiciona um item personalizado na primeira posicao da lista.
+        if ( $this->useCustomItem ) {
+            $key = "X" . $this->customItemKey;
+            $value = $this->customItemValue;
+            $retval[$key] = $value;
+        }
+
+        // Itens do banco.
+        while( $row = $query->fetchrow() ) {
+            $key          = "X" . $row[mb_strtoupper($this->keyColumn)];
+            $value        = $row[mb_strtoupper($this->valueColumn)];
+            $retval[$key] = $value;
+        }
+
+        $this->options = $retval;
+    }
+}
+
+/*
+ * Monta um combo box com as cidades da tabela "cidades".
+ */
+class ComboCidades extends DBComboBox {
+    var $descriptor = "function ComboCidades(&\$DB, \$name, \$value, \$selecione=\"\") ";
+
+    function ComboCidades(&$DB, $name, $value, $selecione="", $disable = false) {
+        $this->name = $name;
+        $this->conn = $DB;
+        $this->setValue( $value );
+		$this->disable = $disable;
+
+        $this->setSQL( "select cid_id, TRANSLATE(UPPER(cid_nome),'ÄÃÀÁÂÕÓÖÒÔÉÊËÍÌÏÜÚÙÇ','AAAAAOOOOOEEEIIIUUUC')||' ('||CID_EST||')' cid_nome from cidades order by 2" );
+        //$this->setSQL( "select CID_ID, CID_NOME from CIDADES order by CID_NOME" );
+        $this->setKeyColumn( "cid_id" );
+        $this->setValueColumn( "cid_nome" );
+        $this->setUseCustomItem( true );
+        $this->setCustomItemKey( -1 );
+        if (trim($selecione)=="")
+        {
+            $this->setCustomItemValue( "SELECIONE" );
+        }
+        else
+        {
+            $this->setCustomItemValue( $selecione );
+        }
+        $this->build();
+    }
+}
+
+/*
+ * Monta um combo box com os registros de deficiencia da tabela
+ * "tipo_deficiencia".
+ */
+class ComboDeficienciaEx extends DBComboBox {
+    var $descriptor = "function ComboDeficienciaEx(&\$DB, \$name, \$value, , \$disable)";
+
+    function ComboDeficienciaEx(&$DB, $name, $value, $disable=false) {
+        $this->name = $name;
+        $this->conn = &$DB;
+        $this->disable = $disable;
+        $this->setValue( $value );
+
+        $this->setSQL( "select TIPD_ID, TIP_DESCRICAO from TIPO_DEFICIENCIA order by TIPD_ID" );
+        $this->setKeyColumn( "TIPD_ID" );
+        $this->setValueColumn( "TIP_DESCRICAO" );
+        $this->setUseCustomItem( true );
+        $this->setCustomItemKey( -1 );
+        $this->setCustomItemValue( "Nenhuma" );
+        $this->build();
+    }
+}
+
+/*
+ * Monta um combo box com os estados civil cadastrados na tabela
+ * "estado_civil_uni".
+ */
+class ComboEstadoCivil extends DBComboBox{
+    var $descriptor = "function ComboEstadoCivil(&\$DB, \$name, \$value)";
+    function ComboEstadoCivil(&$DB, $name, $value)
+    {
+        $this->name = $name;
+        $this->conn = $DB;
+        $this->setValue( $value );
+
+        $this->setSQL( "select estc_id, estc_descr from estado_civil_uni" );
+        $this->setKeyColumn( "estc_id" );
+        $this->setValueColumn( "estc_descr" );
+        $this->build();
+    }
+}
+
+/*
+ * Monta um combo box com as religioes da tabela "religioes".
+ */
+class ComboReligiao extends DBComboBox{
+    var $descriptor = "function ComboReligiao(&\$DB, \$name, \$value)";
+
+    function ComboReligiao(&$DB, $name, $value)
+    {
+        $this->name = $name;
+        $this->conn = $DB;
+        $this->setValue( $value );
+
+        $this->setSQL( "select rel_id, rel_desc from religioes" );
+        $this->setKeyColumn( "rel_id" );
+        $this->setValueColumn( "rel_desc" );
+        $this->setUseCustomItem( true );
+        $this->setCustomItemKey( "" );
+        $this->setCustomItemValue( "SELECIONE" );
+        $this->build();
+    }
+}
+
+/*
+ * Monta um combo box com as possiveis situacoes de um funcionário.
+ * DICA: Isso poderia estar em uma tabela no banco ou em algum arquivo
+ *       de configuracao, apenas pra nao ficar "hardcoded" no fonte.
+ */
+class comboSituacaoFuncionario extends ComboBox {
+    var $descriptor = "function comboSituacaoFuncionario(\$name, \$value, \$selecione = \"Selecione\")  returns array";
+    var $options = array(
+            "X0" => "Normal",
+            "X1" => "Desligado",
+            "X2" => "Afastado",
+        );
+
+    function comboSituacaoFuncionario($name, $value, $selecione = "Selecione") {
+        $this->name = $name;
+        $this->value = "X".$value;
+
+        $default = array('' => $selecione);
+        $this->options = array_merge($default, $this->options);
+
+        return $this->options;
+    }
+}
+
+
+
+// classe de paises
+class comboPaises extends ComboBox {
+    var $descriptor = "function comboPaises() returns array";
+    var $options = array(
+        "br" => "Brasil",
+        "ac" => "Ascension Island",
+        "ad" => "Andorra",
+        "ae" => "United Arab Emirates",
+        "af" => "Afghanistan",
+        "ag" => "Antigua and Barbuda",
+        "ai" => "Anguilla",
+        "al" => "Albania",
+        "am" => "Armenia",
+        "an" => "Netherlands Antilles",
+        "ao" => "Angola",
+        "aq" => "Antarctica",
+        "ar" => "Argentina",
+        "as" => "American Samoa",
+        "at" => "Austria",
+        "au" => "Australia",
+        "aw" => "Aruba",
+        "az" => "Azerbaijan",
+        "ba" => "Bosnia and Herzegovina",
+        "bb" => "Barbados",
+        "bd" => "Bangladesh",
+        "be" => "Belgium",
+        "bf" => "Burkina Faso",
+        "bg" => "Bulgaria",
+        "bh" => "Bahrain",
+        "bi" => "Burundi",
+        "bj" => "Benin",
+        "bm" => "Bermuda",
+        "bn" => "Brunei Darussalam",
+        "bo" => "Bolivia",
+        "bs" => "Bahamas",
+        "bt" => "Bhutan",
+        "bv" => "Bouvet Island",
+        "bw" => "Botswana",
+        "by" => "Belarus",
+        "bz" => "Belize",
+        "ca" => "Canada",
+        "cc" => "Cocos (Keeling) Islands",
+        "cd" => "Congo, Democratic Republic of the",
+        "cf" => "Central African Republic",
+        "cg" => "Congo, Republic of",
+        "ch" => "Switzerland",
+        "ci" => "Cote d'Ivoire",
+        "ck" => "Cook Islands",
+        "cl" => "Chile",
+        "cm" => "Cameroon",
+        "cn" => "China",
+        "co" => "Colombia",
+        "cr" => "Costa Rica",
+        "cu" => "Cuba",
+        "cv" => "Cap Verde",
+        "cx" => "Christmas Island",
+        "cy" => "Cyprus",
+        "cz" => "Czech Republic",
+        "de" => "Germany",
+        "dj" => "Djibouti",
+        "dk" => "Denmark",
+        "dm" => "Dominica",
+        "do" => "Dominican Republic",
+        "dz" => "Algeria",
+        "ec" => "Ecuador",
+        "ee" => "Estonia",
+        "eg" => "Egypt",
+        "eh" => "Western Sahara",
+        "er" => "Eritrea",
+        "es" => "Spain",
+        "et" => "Ethiopia",
+        "fi" => "Finland",
+        "fj" => "Fiji",
+        "fk" => "Falkland Islands (Malvina)",
+        "fm" => "Micronesia, Federal State of",
+        "fo" => "Faroe Islands",
+        "fr" => "France",
+        "ga" => "Gabon",
+        "gd" => "Grenada",
+        "ge" => "Georgia",
+        "gf" => "French Guiana",
+        "gg" => "Guernsey",
+        "gh" => "Ghana",
+        "gi" => "Gibraltar",
+        "gl" => "Greenland",
+        "gm" => "Gambia",
+        "gn" => "Guinea",
+        "gp" => "Guadeloupe",
+        "gq" => "Equatorial Guinea",
+        "gr" => "Greece",
+        "gs" => "South Georgia and the South Sandwich Islands",
+        "gt" => "Guatemala",
+        "gu" => "Guam",
+        "gw" => "Guinea-Bissau",
+        "gy" => "Guyana",
+        "hk" => "Hong Kong",
+        "hm" => "Heard and McDonald Islands",
+        "hn" => "Honduras",
+        "hr" => "Croatia/Hrvatska",
+        "ht" => "Haiti",
+        "hu" => "Hungary",
+        "id" => "Indonesia",
+        "ie" => "Ireland",
+        "il" => "Israel",
+        "im" => "Isle of Man",
+        "in" => "India",
+        "io" => "British Indian Ocean Territory",
+        "iq" => "Iraq",
+        "ir" => "Iran (Islamic Republic of)",
+        "is" => "Iceland",
+        "it" => "Italy",
+        "je" => "Jersey",
+        "jm" => "Jamaica",
+        "jo" => "Jordan",
+        "jp" => "Japan",
+        "ke" => "Kenya",
+        "kg" => "Kyrgyzstan",
+        "kh" => "Cambodia",
+        "ki" => "Kiribati",
+        "km" => "Comoros",
+        "kn" => "Saint Kitts and Nevis",
+        "kp" => "Korea, Democratic People's Republic",
+        "kr" => "Korea, Republic of",
+        "kw" => "Kuwait",
+        "ky" => "Cayman Islands",
+        "kz" => "Kazakhstan",
+        "la" => "Lao People's Democratic Republic",
+        "lb" => "Lebanon",
+        "lc" => "Saint Lucia",
+        "li" => "Liechtenstein",
+        "lk" => "Sri Lanka",
+        "lr" => "Liberia",
+        "ls" => "Lesotho",
+        "lt" => "Lithuania",
+        "lu" => "Luxembourg",
+        "lv" => "Latvia",
+        "ly" => "Libyan Arab Jamahiriya",
+        "ma" => "Morocco",
+        "mc" => "Monaco",
+        "md" => "Moldova, Republic of",
+        "mg" => "Madagascar",
+        "mh" => "Marshall Islands",
+        "mk" => "Macedonia, Former Yugoslav Republic",
+        "ml" => "Mali",
+        "mm" => "Myanmar",
+        "mn" => "Mongolia",
+        "mo" => "Macau",
+        "mp" => "Northern Mariana Islands",
+        "mq" => "Martinique",
+        "mr" => "Mauritania",
+        "ms" => "Montserrat",
+        "mt" => "Malta",
+        "mu" => "Mauritius",
+        "mv" => "Maldives",
+        "mw" => "Malawi",
+        "mx" => "Mexico",
+        "my" => "Malaysia",
+        "mz" => "Mozambique",
+        "na" => "Namibia",
+        "nc" => "New Caledonia",
+        "ne" => "Niger",
+        "nf" => "Norfolk Island",
+        "ng" => "Nigeria",
+        "ni" => "Nicaragua",
+        "nl" => "Netherlands",
+        "no" => "Norway",
+        "np" => "Nepal",
+        "nr" => "Nauru",
+        "nu" => "Niue",
+        "nz" => "New Zealand",
+        "om" => "Oman",
+        "pa" => "Panama",
+        "pe" => "Peru",
+        "pf" => "French Polynesia",
+        "pg" => "Papua New Guinea",
+        "ph" => "Philippines",
+        "pk" => "Pakistan",
+        "pl" => "Poland",
+        "pm" => "St. Pierre and Miquelon",
+        "pn" => "Pitcairn Island",
+        "pr" => "Puerto Rico",
+        "ps" => "Palestinian Territories",
+        "pt" => "Portugal",
+        "pw" => "Palau",
+        "py" => "Paraguay",
+        "qa" => "Qatar",
+        "re" => "Reunion Island",
+        "ro" => "Romania",
+        "ru" => "Russian Federation",
+        "rw" => "Rwanda",
+        "sa" => "Saudi Arabia",
+        "sb" => "Solomon Islands",
+        "sc" => "Seychelles",
+        "sd" => "Sudan",
+        "se" => "Sweden",
+        "sg" => "Singapore",
+        "sh" => "St. Helena",
+        "si" => "Slovenia",
+        "sj" => "Svalbard and Jan Mayen Islands",
+        "sk" => "Slovak Republic",
+        "sl" => "Sierra Leone",
+        "sm" => "San Marino",
+        "sn" => "Senegal",
+        "so" => "Somalia",
+        "sr" => "Suriname",
+        "st" => "Sao Tome and Principe",
+        "sv" => "El Salvador",
+        "sy" => "Syrian Arab Republic",
+        "sz" => "Swaziland",
+        "tc" => "Turks and Caicos Islands",
+        "td" => "Chad",
+        "tf" => "French Southern Territories",
+        "tg" => "Togo",
+        "th" => "Thailand",
+        "tj" => "Tajikistan",
+        "tk" => "Tokelau",
+        "tm" => "Turkmenistan",
+        "tn" => "Tunisia",
+        "to" => "Tonga",
+        "tp" => "East Timor",
+        "tr" => "Turkey",
+        "tt" => "Trinidad and Tobago",
+        "tv" => "Tuvalu",
+        "tw" => "Taiwan",
+        "tz" => "Tanzania",
+        "ua" => "Ukraine",
+        "ug" => "Uganda",
+        "uk" => "United Kingdom",
+        "um" => "US Minor Outlying Islands",
+        "us" => "United States",
+        "uy" => "Uruguay",
+        "uz" => "Uzbekistan",
+        "va" => "Holy See (City Vatican State)",
+        "vc" => "Saint Vincent and the Grenadines",
+        "ve" => "Venezuela",
+        "vg" => "Virgin Islands (British)",
+        "vi" => "Virgin Islands (USA)",
+        "vn" => "Vietnam",
+        "vu" => "Vanuatu",
+        "wf" => "Wallis and Futuna Islands",
+        "ws" => "Western Samoa",
+        "ye" => "Yemen",
+        "yt" => "Mayotte",
+        "yu" => "Yugoslavia",
+        "za" => "South Africa",
+        "zm" => "Zambia",
+        "zw" => "Zimbabwe",
+        "ot" => "Other (not in list)"
+    );
+
+    function comboPaises() {
+        return $this->options;
+    }
+} //fim classe
+
+
+class comboPaisesNome {
+    var $descriptor = "function getPaises() return array";
+    var $options = array(
+        'Brasil'=>'Brasil',
+        'Albania'=>'Albania',
+        'Algeria'=>'Algeria',
+        'American Samoa'=>'American Samoa',
+        'Andorra'=>'Andorra',
+        'Angola'=>'Angola',
+        'Anguilla'=>'Anguilla',
+        'Antarctica'=>'Antarctica',
+        'Antigua and Barbuda'=>'Antigua and Barbuda',
+        'Argentina'=>'Argentina',
+        'Armenia'=>'Armenia',
+        'Aruba'=>'Aruba',
+        'Australia'=>'Australia',
+        'Austria'=>'Austria',
+        'Azerbaijan'=>'Azerbaijan',
+        'Bahamas'=>'Bahamas',
+        'Bahrain'=>'Bahrain',
+        'Bangladesh'=>'Bangladesh',
+        'Barbados'=>'Barbados',
+        'Belarus'=>'Belarus',
+        'Belgium'=>'Belgium',
+        'Belize'=>'Belize',
+        'Benin'=>'Benin',
+        'Bermuda'=>'Bermuda',
+        'Bhutan'=>'Bhutan',
+        'Bolivia'=>'Bolivia',
+        'Bosnia and Herzegovina'=>'Bosnia and Herzegovina',
+        'Botswana'=>'Botswana',
+        'Bouvet Island'=>'Bouvet Island',
+        'British Indian Ocean Territory'=>'British Indian Ocean Territory',
+        'British Virgin Islands'=>'British Virgin Islands',
+        'Brunei Darussalam'=>'Brunei Darussalam',
+        'Bulgaria'=>'Bulgaria',
+        'Burkina Faso'=>'Burkina Faso',
+        'Burundi'=>'Burundi',
+        'Cambodia'=>'Cambodia',
+        'Cameroon'=>'Cameroon',
+        'Canada'=>'Canada',
+        'Cape Verde'=>'Cape Verde',
+        'Cayman Islands'=>'Cayman Islands',
+        'Central African Republic'=>'Central African Republic',
+        'Chad'=>'Chad',
+        'Chile'=>'Chile',
+        'China'=>'China',
+        'Christmas Island'=>'Christmas Island',
+        'Cocos (Keeling) Islands'=>'Cocos (Keeling) Islands',
+        'Colombia'=>'Colombia',
+        'Comoros'=>'Comoros',
+        'Congo'=>'Congo',
+        'Congo, the Democratic Republic of the'=>'Congo, the Democratic Republic of the',
+        'Cook Islands'=>'Cook Islands',
+        'Costa Rica'=>'Costa Rica',
+        'Croatia (Hrvatska)'=>'Croatia (Hrvatska)',
+        'Cyprus'=>'Cyprus',
+        'Czech Republic'=>'Czech Republic',
+        'Denmark'=>'Denmark',
+        'Djibouti'=>'Djibouti',
+        'Dominica'=>'Dominica',
+        'Dominican Republic'=>'Dominican Republic',
+        'East Timor'=>'East Timor',
+        'Ecuador'=>'Ecuador',
+        'Egypt'=>'Egypt',
+        'El Salvador'=>'El Salvador',
+        'Equatorial Guinea'=>'Equatorial Guinea',
+        'Eritrea'=>'Eritrea',
+        'Estonia'=>'Estonia',
+        'Ethiopia'=>'Ethiopia',
+        'Faeroe Islands'=>'Faeroe Islands',
+        'Falkland Islands (Malvinas)'=>'Falkland Islands (Malvinas)',
+        'Fiji'=>'Fiji',
+        'Finland'=>'Finland',
+        'France'=>'France',
+        'French Guiana'=>'French Guiana',
+        'French Polynesia'=>'French Polynesia',
+        'French Southern Territories'=>'French Southern Territories',
+        'Gabon'=>'Gabon',
+        'Gambia'=>'Gambia',
+        'Georgia'=>'Georgia',
+        'Germany'=>'Germany',
+        'Ghana'=>'Ghana',
+        'Gibraltar'=>'Gibraltar',
+        'Greece'=>'Greece',
+        'Greenland'=>'Greenland',
+        'Grenada'=>'Grenada',
+        'Guadeloupe'=>'Guadeloupe',
+        'Guam'=>'Guam',
+        'Guatemala'=>'Guatemala',
+        'Guinea'=>'Guinea',
+        'Guinea-Bissau'=>'Guinea-Bissau',
+        'Guyana'=>'Guyana',
+        'Haiti'=>'Haiti',
+        'Heard and Mc Donald Islands'=>'Heard and Mc Donald Islands',
+        'Holy See (Vatican City State)'=>'Holy See (Vatican City State)',
+        'Honduras'=>'Honduras',
+        'Hong Kong'=>'Hong Kong',
+        'Hungary'=>'Hungary',
+        'Iceland'=>'Iceland',
+        'India'=>'India',
+        'Indonesia'=>'Indonesia',
+        'Ireland'=>'Ireland',
+        'Israel'=>'Israel',
+        'Italy'=>'Italy',
+        'Ivory Coast'=>'Ivory Coast',
+        'Jamaica'=>'Jamaica',
+        'Japan'=>'Japan',
+        'Jordan'=>'Jordan',
+        'Kazakhstan'=>'Kazakhstan',
+        'Kenya'=>'Kenya',
+        'Kiribati'=>'Kiribati',
+        'Korea, Republic of'=>'Korea, Republic of',
+        'Kuwait'=>'Kuwait',
+        'Kyrgyzstan'=>'Kyrgyzstan',
+        'Lao People´s Democratic Republic'=>'Lao People´s Democratic Republic',
+        'Latvia'=>'Latvia',
+        'Lebanon'=>'Lebanon',
+        'Lesotho'=>'Lesotho',
+        'Liberia'=>'Liberia',
+        'Liechtenstein'=>'Liechtenstein',
+        'Lithuania'=>'Lithuania',
+        'Luxembourg'=>'Luxembourg',
+        'Macao'=>'Macao',
+        'Macedonia'=>'Macedonia',
+        'Madagascar'=>'Madagascar',
+        'Malawi'=>'Malawi',
+        'Malaysia'=>'Malaysia',
+        'Maldives'=>'Maldives',
+        'Mali'=>'Mali',
+        'Malta'=>'Malta',
+        'Marshall Islands'=>'Marshall Islands',
+        'Martinique'=>'Martinique',
+        'Mauritania'=>'Mauritania',
+        'Mauritius'=>'Mauritius',
+        'Mayotte'=>'Mayotte',
+        'Mexico'=>'Mexico',
+        'Micronesia, Federated States of'=>'Micronesia, Federated States of',
+        'Moldova, Republic of'=>'Moldova, Republic of',
+        'Monaco'=>'Monaco',
+        'Mongolia'=>'Mongolia',
+        'Montserrat'=>'Montserrat',
+        'Morocco'=>'Morocco',
+        'Mozambique'=>'Mozambique',
+        'Namibia'=>'Namibia',
+        'Nauru'=>'Nauru',
+        'Nepal'=>'Nepal',
+        'Netherlands'=>'Netherlands',
+        'Netherlands Antilles'=>'Netherlands Antilles',
+        'New Caledonia'=>'New Caledonia',
+        'New Zealand'=>'New Zealand',
+        'Nicaragua'=>'Nicaragua',
+        'Niger'=>'Niger',
+        'Nigeria'=>'Nigeria',
+        'Niue'=>'Niue',
+        'Norfolk Island'=>'Norfolk Island',
+        'Northern Mariana Islands'=>'Northern Mariana Islands',
+        'Norway'=>'Norway',
+        'Oman'=>'Oman',
+        'Pakistan'=>'Pakistan',
+        'Palau'=>'Palau',
+        'Palestinian Territory'=>'Palestinian Territory',
+        'Panama'=>'Panama',
+        'Papua New Guinea'=>'Papua New Guinea',
+        'Paraguay'=>'Paraguay',
+        'Peru'=>'Peru',
+        'Philippines'=>'Philippines',
+        'Pitcairn'=>'Pitcairn',
+        'Poland'=>'Poland',
+        'Portugal'=>'Portugal',
+        'Puerto Rico'=>'Puerto Rico',
+        'Qatar'=>'Qatar',
+        'Reunion'=>'Reunion',
+        'Romania'=>'Romania',
+        'Russian Federation'=>'Russian Federation',
+        'Rwanda'=>'Rwanda',
+        'Saint Helena'=>'Saint Helena',
+        'Saint Kitts and Nevis'=>'Saint Kitts and Nevis',
+        'Saint Lucia'=>'Saint Lucia',
+        'Saint Pierre and Miquelon'=>'Saint Pierre and Miquelon',
+        'Saint Vincent and the Grenadines'=>'Saint Vincent and the Grenadines',
+        'Samoa'=>'Samoa',
+        'San Marino'=>'San Marino',
+        'Sao Tome and Principe'=>'Sao Tome and Principe',
+        'Saudi Arabia'=>'Saudi Arabia',
+        'Senegal'=>'Senegal',
+        'Seychelles'=>'Seychelles',
+        'Sierra Leone'=>'Sierra Leone',
+        'Singapore'=>'Singapore',
+        'Slovakia'=>'Slovakia',
+        'Slovenia'=>'Slovenia',
+        'Solomon Islands'=>'Solomon Islands',
+        'Somalia'=>'Somalia',
+        'South Africa'=>'South Africa',
+        'South Georgia and the South Sandwich Islands'=>'South Georgia and the South Sandwich Islands',
+        'Spain'=>'Spain',
+        'Sri Lanka'=>'Sri Lanka',
+        'Surinam'=>'Surinam',
+        'Svalbard and Jan Mayen Islands'=>'Svalbard and Jan Mayen Islands',
+        'Swaziland'=>'Swaziland',
+        'Sweden'=>'Sweden',
+        'Switzerland'=>'Switzerland',
+        'Taiwan'=>'Taiwan',
+        'Tajikistan'=>'Tajikistan',
+        'Tanzania, United Republic of'=>'Tanzania, United Republic of',
+        'Thailand'=>'Thailand',
+        'Togo'=>'Togo',
+        'Tokelau'=>'Tokelau',
+        'Tonga'=>'Tonga',
+        'Trinidad and Tobago'=>'Trinidad and Tobago',
+        'Tunisia'=>'Tunisia',
+        'Turkey'=>'Turkey',
+        'Turkmenistan'=>'Turkmenistan',
+        'Turks and Caicos Islands'=>'Turks and Caicos Islands',
+        'Tuvalu'=>'Tuvalu',
+        'Uganda'=>'Uganda',
+        'Ukraine'=>'Ukraine',
+        'United Arab Emirates'=>'United Arab Emirates',
+        'United Kingdom'=>'United Kingdom',
+        'United States'=>'United States',
+        'United States Minor Outlying Islands'=>'United States Minor Outlying Islands',
+        'United States Virgin Islands'=>'United States Virgin Islands',
+        'Uruguay'=>'Uruguay',
+        'Uzbekistan'=>'Uzbekistan',
+        'Vanuatu'=>'Vanuatu',
+        'Venezuela'=>'Venezuela',
+        'Viet Nam'=>'Viet Nam',
+        'Wallis and Futuna Islands'=>'Wallis and Futuna Islands',
+        'Western Sahara'=>'Western Sahara',
+        'Yemen'=>'Yemen',
+        'Yugoslavia'=>'Yugoslavia',
+        'Zambia'=>'Zambia',
+        'Zimbabwe'=>'Zimbabwe',
+        'Other (Not in list)'=>'Other (Not in list)'
+        );
+
+  function getPaises($selecione = false){
+	/*if($selecione!=false){		
+		array_push($this->options, "Selecione");
+	}
+	*/
+    return $this->options;
+  }
+}
+// classe de dias da semana
+
+class comboDiasSemana extends ComboBox {
+    var $descriptor = "function comboDiasSemana() returns array()";
+  var $options = array(
+        "DOMINGO" => "DOMINGO",
+        "SEGUNDA" => "SEGUNDA",
+        "TERÇA" => "TERÇA",
+        "QUARTA" => "QUARTA",
+        "QUINTA" => "QUINTA",
+        "SEXTA" => "SEXTA",
+        "SABADO" => "SÁBADO"
+    );
+    function comboDiasSemana() {
+        return $this->options;
+    }
+} //fim classe
+
+// classe de estados Brasileiros
+class comboUF extends ComboBox {
+    var $descriptor = "function comboUF() returns array()";
+    var $options = array(
+        "rs" => "RS",
+        "ac" => "AC",
+        "al" => "AL",
+        "am" => "AM",
+        "ap" => "AP",
+        "ba" => "BA",
+        "ce" => "CE",
+        "df" => "DF",
+        "es" => "ES",
+        "go" => "GO",
+        "ma" => "MA",
+        "mg" => "MG",
+        "ms" => "MS",
+        "mt" => "MT",
+        "pa" => "PA",
+        "pb" => "PB",
+        "pe" => "PE",
+        "pi" => "PI",
+        "pr" => "PR",
+        "rj" => "RJ",
+        "rn" => "RN",
+        "ro" => "RO",
+        "rr" => "RR",
+        "sc" => "SC",
+        "se" => "SE",
+        "sp" => "SP",
+        "to" => "TO"
+    );
+    function comboUF() {
+        return $this->options;
+    }
+} //fim classe
+
+
+// Classes de Meses do ano
+class comboMeses extends comboBox {
+    var $descriptor = "function comboMeses(\$name, \$label, \$value, \$disable=false)";
+    var $opt = array(
+        "01" => "JANEIRO",
+        "02" => "FEVEREIRO",
+        "03" => "MARÇO",
+        "04" => "ABRIL",
+        "05" => "MAIO",
+        "06" => "JUNHO",
+        "07" => "JULHO",
+        "08" => "AGOSTO",
+        "09" => "SETEMBRO",
+        "10" => "OUTUBRO",
+        "11" => "NOVEMBRO",
+        "12" => "DEZEMBRO"
+    );
+
+    function comboMeses($name,$label,$value,$disable=false) {
+        $this->name = $name;
+        $this->label = $label;
+        $this->value = $value;
+        $this->disable = $disable;
+        $this->options = $this->opt;
+    }
+} //fim classe
+
+
+//Classe de cidades regiao metropolitana
+class comboCidadesMetropolitana extends comboBox{
+    var $descriptor = "function comboCidadesMetropolitana(\$name, \$label, \$value)";
+    var $opt = array (
+        ""    =>"SELECIONE",
+        "133" =>"CACHOEIRINHA",
+        "02"  =>"CANOAS",
+        "217" =>"ESTEIO",
+        "135" =>"GRAVATAÍ",
+        "117" =>"GUAÍBA",
+        "01"  =>"PORTO ALEGRE",
+        "56"  =>"SÃO LEOPOLDO",
+        "90"  =>"SAPUCAIA DO SUL",
+        "22"  =>"VIAMÃO"
+        );
+
+    function comboCidadesMetropolitana($name,$label,$value) {
+        $this->name = $name;
+        $this->label = $label;
+        $this->value = $value;
+        $this->options = $this->opt;
+    }
+}
+
+
+// Classes de Dias do mes
+class comboDiaMes extends comboBox{
+    var $descriptor = "function comboDiaMes(\$name, \$label, \$value, \$selecione = '', \$disable = false)";
+    var $opt = array();
+
+    function comboDiaMes($name, $label, $value, $selecione = '', $disable=false){
+        for ($i=1; $i<32; $i++){
+            $this->opt["c".$i] = $i;
+        }
+        $this->ComboBox($label, $name, $value, $this->opt, $selecione, $disable);
+    }
+
+} //fim classe
+
+// Classe de numero do ano
+class comboNumeroAno extends ComboBox {
+    var $descriptor = "function comboNumeroAno(\$name, \$label, \$value, \$inicio=1900, \$fim=1990, \$disable=false, \$js='')";
+    var $opt;
+    var $r;
+
+    function comboNumeroAno($name,$label,$value,$inicio=1900,$fim=1990,$disable=false,$js="") {
+        $this->opt = array();
+        $this->r = array();
+
+        for ($i=$inicio;$i<=$fim;$i++){
+            $r = array($i, $i);
+            $this->opt = array_merge(array($r), $this->opt);
+        }
+        $this->name = $name;
+        $this->label = $label;
+        $this->value = $value;
+        $this->disable = $disable;
+        $this->js = $js;
+        $this->options = $this->opt;
+
+    }
+} //fim classe
+
+//classe comboDiaMesAno
+class comboDiaMesAno extends ComboBox{
+    var $descriptor = "function comboDiaMesAno(\$name, \$value, \$anoInicio, \$anoFim)";
+    var $options;
+    var $dataN;
+    var $dia;
+    var $mes;
+    var $ano;
+
+    function comboDiaMesAno($name,$value,$anoInicio,$anoFim){
+        $this->name = $name;
+        $this->value = $value;
+        $this->dia = new comboDiaMes(dia,dia);
+        $this->mes = new comboMeses(mes,mes);
+        $this->ano = new comboNumeroAno(ano,ano,$anoInicio,$anoFim);
+
+        $this->dataN = new ToolButton();
+
+        $this->dataN->AddButton($dia);
+        $this->dataN->AddButton($mes);
+        $this->dataN->AddButton($ano);
+
+        return $dataN;
+
+    }
+
+}
+
+// Classe de sexo
+class comboSexo extends ComboBox {
+    var $descriptor = "function comboSexo() returns array";
+    var $options = array(
+        "01" => "MASCULINO",
+        "02" => "FEMININO",
+    );
+    function comboSexo() {
+        return $this->options;
+    }
+} //fim classe
+
+// Classe de sexo
+class comboSexoMF extends ComboBox {
+    var $descriptor = "function comboSexoMF( \$name = '', \$value = '', \$selecione = '', \$disable=false )";
+    var $options = array("M" => "Masculino",    "F" => "Feminino"   );
+
+    function comboSexoMF( $name = '', $value = '', $selecione = '', $disable=false ){
+        $this->ComboBox("", $name, $value, $this->options, $selecione, $disable);
+    }
+} //fim classe
+
+// Classe de Semestre
+class comboSemestres extends ComboBox {
+    var $descriptor = "function comboSemestres(&\$DB, \$normal = false, \$name = \"\", \$selecione = \"\", \$tirarIntensivo = false, \$textoPadrao = \"Selecione\", \$disable=false, \$js='', \$tipoSemestre='0', \$ordem='desc', \$anoInicial = '') ";
+    var $options;
+
+    /******
+        $tipo = 0 -> todos os semestre
+        $tipo = 1 -> somente os semestres (SEM_SEMESTRE <= 2 )
+        $tipo = 2 -> somente os trimestres (SEM_SEMESTRE > 2)
+    ******/
+
+    function comboSemestres(&$DB, $normal = false, $name = "", $selecione = "", $tirarIntensivo = false, $textoPadrao = "Selecione", $disable=false, $js="", $tipoSemestre='0', $ordem='desc', $anoInicial = '') {
+        $sem = new semestre($DB);
+        //$this->options = $sem->getAllSemestre($normal, $tirarIntensivo);
+        $this->options = $sem->getSemestreTipo($tipoSemestre, $normal, $tirarIntensivo, $ordem, $anoInicial);
+        $this->name = $name;
+        $this->value = $selecione;
+        $this->disable = $disable;
+        $this->js = $js;
+
+        //verifica se eh necessario colocar o selecione
+        if (!empty($textoPadrao)) {
+            $o = current($this->options);
+
+            if (is_array($o)) {
+                $default = array('', $textoPadrao);
+                $this->options = array_merge(array($default), $this->options);
+            } else {
+                // simple array
+                $default = array('' => $textoPadrao);
+                $this->options = array_merge($default, $this->options);
+            }
+        }
+
+        return $this->options;
+    }
+} //fim classe
+
+class comboSemestresTipo extends ComboBox {
+    var $descriptor = "function comboSemestres(&\$DB, \$tipoCombo, \$name = '', \$selecione = '', \$textoPadrao = 'Selecione', \$disable = false, \$js='') ";
+    var $options;
+
+    function comboSemestresTipo(&$DB, $tipoCombo, $name = "", $selecione = "", $textoPadrao = "Selecione", $disable = false, $js="") {
+        $sem = new semestre($DB);
+        $this->options = $sem->getSemestreTipo($tipoCombo);
+        $this->name = $name;
+        $this->value = $selecione;
+        $this->disable = $disable;
+        $this->js = $js;
+
+        //verifica se eh necessario colocar o selecione
+        if (!empty($textoPadrao)) {
+            $o = current($this->options);
+
+            if (is_array($o)) {
+                $default = array('', $textoPadrao);
+                $this->options = array_merge(array($default), $this->options);
+            } else {
+                // simple array
+                $default = array('' => $textoPadrao);
+                $this->options = array_merge($default, $this->options);
+            }
+        }
+
+        return $this->options;
+    }
+} //fim classe
+
+
+///inserido por MANOEL DIAS
+class comboGrupoFinanceiro extends ComboBox {
+    var $descriptor = "function comboGrupoFinanceiro(&\$DB, \$name = \"\", \$selecione = \"\", \$disable=false)";
+    var $options;
+
+    function comboGrupoFinanceiro(&$DB, $name = "", $selecione = "", $disable = false) {
+        $valor=array();
+        $qry = new genericQuery($DB);
+
+        $sql = "\n Select distinct grf_id, grf_desc "
+                ."\n From grupo_financeiro "
+                ."\n Order By grf_desc ";
+        $qry->TQuery($sql);
+        while($row = $qry->fetchrow()){
+            $valor['c'.$row["GRF_ID"]] = $row["GRF_DESC"];
+        } // while
+
+        $this->options = $valor;
+        $this->name = $name;
+        $this->value = $selecione;
+        $this->disable = $disable;
+        return $this->options;
+    }
+} //fim classe
+
+class comboSemestresProcSelecao extends ComboBox {
+    var $descriptor = "function comboSemestresProcSelecao(&\$DB, \$name = \"\", \$selecione = \"\") ";
+    var $options;
+
+    function comboSemestresProcSelecao(&$DB, $name = "", $selecione = "") {
+        $valor=array();
+        $qry = new genericQuery($DB);
+
+        $sql = " Select distinct pro_ano||'/'||pro_semestre semestre, ".
+                " pro_ano||'-'||pro_semestre valor".
+                " From processo_selecao ".
+                " Order By pro_ano||'/'||pro_semestre desc";
+        $qry->TQuery($sql);
+        while($row = $qry->fetchrow()){
+            $valor[$row["VALOR"]] = $row["SEMESTRE"];
+        } // while
+
+        $this->options = $valor;
+        $this->name = $name;
+        $this->value = $selecione;
+        return $this->options;
+    }
+} //fim classe
+
+// Classe de Turnos
+class comboTurnos extends ComboBox {
+    var $descriptor = "function comboTurnos() returns array";
+    var $options = array("01" => "MANHÃ", "02" => "TARDE", "03" => "NOITE", "04" => "VESPERTINO");
+    function comboTurnos() {
+        return $this->options;
+    }
+} //fim classe
+
+class comboTurnosBD extends ComboBox{
+    var $descriptor = "function comboTurnosBD(&\$DB, \$label, \$name, \$value, \$selecione = '', \$textoPadrao = \"\")";
+
+    function comboTurnosBD(&$DB, $label, $name, $value, $selecione = '', $textoPadrao = "", $disable=false){
+        GLOBAL $PHP_SELF;
+        $qry = new genericQuery($DB);
+
+        $sql= "select tur_id, tur_descr ".
+              " from turnos ".
+              " order by tur_id ";
+
+        $turnos = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+                $this->options["t".$row["TUR_ID"]] = mb_strtoupper($row["TUR_DESCR"]);
+        }//while
+        $value = "t".$value;
+
+        //verifica se eh necessario colocar o selecione
+        if (!empty($textoPadrao)) {
+            $o = current($this->options);
+
+            if (is_array($o)) {
+                $default = array('', $textoPadrao);
+                $this->options = array_merge(array($default), $this->options);
+            } else {
+                // simple array
+                $default = array('' => $textoPadrao);
+                $this->options = array_merge($default, $this->options);
+            }
+        }//if
+
+
+        $this->ComboBox($label, $name, $value, $this->options, $selecione, $disable);
+        //return $this->options;
+    }//function
+    //$this->form->AddField(new comboTurnosBD($this->conn, 'turId', 'turId', $this->turId, "t".$this->turId), "Todos os turnos");
+}//class comboTurnosBD
+
+
+// Classe de SIM/NAO
+class comboSimNao extends ComboBox {
+    var $descriptor = "function comboSimNao(\$name, \$value, \$invert=0, \$selecione = \"\", \$disable=false)";
+    var $options = array();
+    //var $options = array("01" => "SIM",   "02" => "NÃO");
+
+    function comboSimNao($name, $value, $invert=0, $selecione='', $disable=false) {
+        $this->name = $name;
+        $this->value = $value;
+        $this->selecione = $selecione;
+        $this->disable = $disable;
+
+        if ($invert==1) {
+            $this->options = array("01" => "NÃO", "02" => "SIM" );
+        }else{
+            $this->options = array("01" => "SIM", "02" => "NÃO");
+        }
+
+        if ($selecione != ""){
+            $this->options[""] = $selecione;
+        }
+        return $this->options;
+    }
+} //fim classe
+
+
+//classe de opcoes de deficiencias
+class comboDeficiencia extends ComboBox{
+    var $descriptor = "function comboDeficiencia(\$name, \$label, \$value)";
+
+    function comboDeficiencia($name,$label,$value){
+        $this->name = $name;
+        $this->label = $label;
+        $this->value = $value;
+        $this->options = array(
+        "01" => "NÃO",
+        "02" => "Visual",
+        "03" =>" Auditiva",
+        "04" =>" Outra");
+
+    }
+}
+
+
+class comboCurso extends ComboBox {
+    var $descriptor = "function comboCurso(&\$DB, \$label, \$name, \$value, \$selecione = 'Selecione', \$disable=false, \$js='', \$id='', \$agrupar='true', \$todosCurso='false' )";
+    var $options;
+
+    function comboCurso(&$DB, $label, $name, $value, $selecione = 'Selecione', $disable=false, $js = '', $id='', $agrupar=true, $todosCurso=false) {
+        $qry = new genericQuery($DB);
+
+        $SQL = "\n select 'POS-'||CUR_ID as CUR_ID,'Pós-Graduação' as categoria, CUR_DESC as CURSO"
+				."\n from sunidba.POS_CURSO"
+				."\n UNION "
+					."\n select 'MTD-'||CUR_ID as CUR_ID,'Mestrado' as categoria, CUR_DESC as CURSO"
+					."\n from sunidba.MESTRADO_CURSO"
+				."\n UNION "
+					."\n select 'GRD-'||CUR_ID as CUR_ID,'Graduação' as categoria, CURSO as CURSO"
+					."\n from VCURSO_UNI"
+				."\n order by CATEGORIA, CURSO";
+		//dump($SQL);
+
+        $qry->TQuery($SQL);
+        $this->options = array();
+        while($dyn = $qry->fetchrow()){		
+			if($todosCurso==true){				
+				if($categoria!=$dyn["CATEGORIA"]){
+					if($dyn["CATEGORIA"]=='Graduação'){
+						$categoria = $dyn["CATEGORIA"];
+						$this->options[$dyn["CATEGORIA"]]["GRD-GRD"] = "TODOS OS CURSOS GRADUAÇÃO";							
+						$this->options[$dyn["CATEGORIA"]][$dyn["CUR_ID"]] = $dyn["CURSO"];	
+					} elseif($dyn["CATEGORIA"]=='Mestrado') {
+						$categoria = $dyn["CATEGORIA"];
+						$this->options[$dyn["CATEGORIA"]]["MTD-MTD"] = "TODOS OS CURSOS MESTRADO";							
+						$this->options[$dyn["CATEGORIA"]][$dyn["CUR_ID"]] = $dyn["CURSO"];	
+					} else {
+						$categoria = $dyn["CATEGORIA"];
+						$this->options[$dyn["CATEGORIA"]]["POS-POS"] = "TODOS OS CURSOS PÓS-GRADUAÇÃO";	
+						$this->options[$dyn["CATEGORIA"]][$dyn["CUR_ID"]] = $dyn["CURSO"];	
+					}
+				} else {
+					$this->options[$dyn["CATEGORIA"]][$dyn["CUR_ID"]] = $dyn["CURSO"];	
+				}
+			} else {
+				$this->options[$dyn["CATEGORIA"]][$dyn["CUR_ID"]] = $dyn["CURSO"];			
+			}
+        }
+
+        $value = "c".$value;
+        $this->ComboBox($label, $name, $value, $this->options, $selecione, $disable, $js, $id, $agrupar, $todosCurso);
+    }
+}
+class comboCursoUni extends ComboBox {
+    var $descriptor = "function comboCursoUni(&\$DB, \$label, \$name, \$value, \$selecione = 'Selecione', \$disable=false, \$js='', \$semestreOuFlagTec='')";
+    var $options;
+
+    function comboCursoUni(&$DB, $label, $name, $value, $selecione = 'Selecione', $disable=false, $js = '', $semestreOuFlagTec='') {
+        $cur = new curso_uni( 0, $DB );
+        $this->options = $cur->getAll($semestreOuFlagTec);
+
+        $this->ComboBox($label, $name, $value, $this->options, $selecione, $disable);
+    }
+}
+
+class comboCursoUniOutroFormato extends ComboBox {
+    var $descriptor = "function comboCursoUniOutroFormato(&\$DB, \$label, \$name, \$value, \$selecione = 'Selecione', \$disable=false, \$js='', \$semestreOuFlagTec='') ";
+    var $options;
+
+    function comboCursoUniOutroFormato(&$DB, $label, $name, $value, $selecione = 'Selecione',$disable = false, $js = '', $semestreOuFlagTec='') {
+        $cur = new curso_uni( 0, $DB );
+        $this->options = $cur->getAllComOutroFormato($semestreOuFlagTec);
+
+        $this->ComboBox($label, $name, $value, $this->options, $selecione,$disable, $js);
+    }
+}
+
+// monta um combo de curso que traz junto o turno em que o mesmo ocorre
+class comboCursoUniComTurno extends ComboBox {
+    var $descriptor = "function comboCursoUniComTurno(&\$DB, \$label, \$name, \$value, \$selecione = 'Selecione', \$disable=false, \$js='', \$semestreOuFlagTec='') ";
+    var $options;
+
+    function comboCursoUniComTurno(&$DB, $label, $name, $value, $selecione = 'Selecione', $disable=false, $js = '', $semestreOuFlagTec='') {
+        $cur = new curso_uni( 0, $DB );
+        $this->options = $cur->getAllComTurno($semestreOuFlagTec);
+
+        $this->ComboBox($label, $name, $value, $this->options, $selecione, $disable, $js, $semestre);
+    }
+}
+
+
+// classe que monta um combo com os anos de matrícula do colégio
+class comboAnosMatriculaColegio extends ComboBox {
+    var $descriptor = "function comboAnosMatriculaColegio(&\$DB, \$label, \$name, \$value, \$selecione = 'Selecione', \$disable = false, \$js = '')";
+    var $options;
+
+    function comboAnosMatriculaColegio(&$DB, $label, $name, $value, $selecione = 'Selecione', $disable = false, $js = ''){
+        $qry = new genericQuery($DB);
+
+        $SQL = "Select distinct mat_ano
+            From matriculados
+            Order BY mat_ano desc";
+
+        //dump($SQL);
+
+        $qry->TQuery($SQL);
+        $this->options = array();
+        while($dyn = $qry->fetchrow()){
+            $this->options["c".$dyn["MAT_ANO"]] = $dyn["MAT_ANO"];
+        }
+
+        $value = "c".$value;
+        $this->ComboBox($label, $name, $value, $this->options, $selecione, $disable, $js);
+    }
+}
+
+// classe que monta um combo com as parcelas do colégio
+class comboParcelasColegio extends ComboBox {
+    var $descriptor = "function comboParcelasColegio(\$label, \$name, \$value, \$selecione = 'Selecione', \$disable = false, \$parcZero = false)";
+    var $options;
+
+    function comboParcelasColegio($label, $name, $value, $selecione = 'Selecione', $disable = false, $parcZero = false){
+
+        if($parcZero==true){
+            $this->options["c0"] = 'Todas';
+        }
+        for ($i=1; $i<=12; $i++){
+            $this->options["c$i"] = $i;
+        }
+
+        $value = "c".$value;
+        $this->ComboBox($label, $name, $value, $this->options, $selecione, $disable, $parcZero);
+    }
+}
+
+// classe que monta um combo com as parcelas doa Graduação
+class comboParcelasGraduacao extends ComboBox {
+    var $descriptor = "function comboParcelasGraduacao(\$label, \$name, \$value, \$selecione = 'Selecione', \$filtraSemestre=false, \$semestre='')";
+    var $options;
+
+    function comboParcelasGraduacao($label, $name, $value, $selecione = 'Selecione', $filtraSemestre=false, $semestre=''){
+        if($filtraSemestre){
+            $this->options = array();
+            if ($semestre != ""){
+                $this->options = array('c1'=>'1', 'c2'=>'2', 'c3'=>'3');
+
+                list($ano, $sem, $int) = explode("-", $semestre);
+                if (($sem < 2) or ($sem == 2)){
+                    $this->options["c4"] = '4';
+                    $this->options["c5"] = '5';
+                    $this->options["c6"] = '6';
+                }
+            }
+        }else{
+            for ($i=1; $i<=6; $i++){
+                $this->options["c$i"] = $i;
+            }
+        }
+
+        $value = "c".$value;
+        $this->ComboBox($label, $name, $value, $this->options, $selecione);
+    }
+
+/*
+        $rowsReturn = array();
+
+        if ($semestre != ""){
+            $rowsReturn = array('0'=>'Selecione', '1'=>'Parcela 1', '2'=>'Parcela 2', '3'=>'Parcela 3');
+
+            list($ano, $sem, $int) = explode("-", $semestre);
+            if (($sem < 2) or ($sem == 2)){
+                $rowsReturn["4"] = 'Parcela 4';
+                $rowsReturn["5"] = 'Parcela 5';
+                $rowsReturn["6"] = 'Parcela 6';
+            }
+        }
+        //echo "<pre>"; print_r($rowsReturn); echo "</pre>";
+        return $rowsReturn;
+*/
+}
+
+// classe que monta o combo com a descrição dos currículos do Colégio
+//(somente currículos que posuem alunos matriculados no ano passado como parâmetro)
+class comboCursosColegio extends ComboBox {
+    var $descriptor = "function comboCursosColegio(&\$DB, \$ano, \$label, \$name, \$value, \$selecione = 'Selecione')";
+    var $options;
+
+    function comboCursosColegio(&$DB, $ano, $label, $name, $value, $selecione = 'Selecione'){
+        $qry = new genericQuery($DB);
+
+        $SQL = "Select distinct cd.crd_id, cd.crd_desc
+            From cur_desc cd, curriculos c, matriculados m
+            Where m.mat_ano = $ano
+            and m.cur_id = c.cur_id
+            and c.crd_id = cd.crd_id
+            Order BY crd_desc";
+
+        $qry->query($SQL);
+        $this->options = array();
+        while($dyn = $qry->fetchrow()){
+            $this->options["c".$dyn["CRD_ID"]] = $dyn["CRD_DESC"];
+        }
+
+        $value = "c".$value;
+        $this->ComboBox($label, $name, $value, $this->options, $selecione);
+    }
+}//class comboCursosColegio
+
+
+class comboProcSelecao extends ComboBox{
+    var $descriptor = "function comboProcSelecao(&\$DB, \$label, \$name, \$value, \$selecione = 'Selecione', \$js = '')";
+    //var ;
+
+    function comboProcSelecao(&$DB, $label, $name, $value, $selecione = 'Selecione', $disable = false, $js='', $mostraProcEspecial=1){
+        GLOBAL $PHP_SELF; //indica que o programa vai retornar os dados para esta página
+        
+        $qry = new genericQuery($DB);
+		$sql = "select P.PRO_ID, P.PRO_DESCR"
+			."\n from PROCESSO_SELECAO P";
+		if ( $mostraProcEspecial == 0 ) {
+			$sql .= "\n where PRO_ESPECIAL = 0";
+		}
+		$sql .= "\n order by P.PRO_ANO desc, P.PRO_SEMESTRE desc, P.PRO_DESCR";
+
+        $this->processos=array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+             $this->processos["i".$row["PRO_ID"]]=$row["PRO_ID"]." - ".$row["PRO_DESCR"];
+      
+        }
+
+        $value = "i".$value;
+        $this->ComboBox($label, $name, $value, $this->processos, $selecione, $disable,$js);
+        
+         
+        
+    }//function $this->form->AddField(new comboProcSelecao($this->conn, 'proId', 'proId', $this->proId, 'Selecione'));
+}//class comboProcSelecao                                                           //name,   label,  value(propriedade), default
+
+
+# Classe que cria um combo para seleção de Estabelecimentos
+class comboEstabelecimentos extends ComboBox {
+    var $descriptor = "function comboEstabelecimentos(&\$DB, \$label, \$name, \$value, \$selecione = '', \$tipId=1)";
+    var $options;
+
+    function comboEstabelecimentos(&$DB, $label, $name, $value, $selecione = '', $tipId=1)
+    {
+        $qry = new genericQuery($DB);
+        /*
+        $SQL = " SELECT ET.EST_ID, e.EST_NOME_REDUZ, "
+              ." e.EST_RAZAO_SOCIAL, e.EST_CNPJ "
+              ." FROM ESTABXTIPO ET, ESTABELECIMENTO E "
+              ." WHERE ET.TIP_ID = ".$tipId
+              ." AND ET.EST_ID=E.EST_ID "
+              ." ORDER BY e.EST_NOME_REDUZ desc";
+              */
+        $SQL = "\n SELECT ET.EST_ID, e.EST_NOME_REDUZ, e.EST_RAZAO_SOCIAL, e.EST_CNPJ,e.cid_id,c.cid_nome||' - '||c.cid_est as cidade "
+                ."\n FROM ESTABXTIPO ET, ESTABELECIMENTO E, cidades c"
+                ."\n WHERE ET.TIP_ID = ".$tipId
+                ."\n AND ET.EST_ID=E.EST_ID "
+                ."\n and e.cid_id = c.cid_id "
+                ."\n ORDER BY e.EST_NOME_REDUZ desc";
+        $qry->query($SQL);
+        $this->options = array();
+        while($dyn = $qry->fetchrow())
+        {
+            //$this->options["c".$dyn["EST_ID"]] = $dyn["EST_NOME_REDUZ"];
+            $this->options["c".$dyn["EST_ID"]] = $dyn["EST_NOME_REDUZ"]." (".$dyn["CIDADE"].")";
+        }
+        $value = "c".$value;
+        $this->ComboBox($label, $name, $value, $this->options, $selecione);
+    }
+}
+
+// Classe que retorna um botão voltar
+class backButton extends FormButton {
+    var $descriptor = "function backButton(\$alinhamento=\"\")";
+    var $vars=array();
+    var $action="";
+    var $formName="";
+    var $btName="";
+    var $btValue="";
+    var $inserirVariaveisREQUESTS;
+    var $align="";
+    var $inserirClassCSS;
+
+    function backButton($alinhamento="") {
+        GLOBAL $PHP_SELF;
+        $this->action = $PHP_SELF;
+        $this->inserirVariaveisREQUESTS = TRUE;
+        $this->vars = array();
+        $this->formName="";
+        $this->btValue="";
+        $this->btName="";
+        $this->align=$alinhamento;
+        $this->inserirClassCSS = false;
+    }
+
+    #Seta a ação do form
+    function setAction($action){
+        $this->action = $action;
+    }
+
+    #Adiciona variáveis ao array que irá montar os campos Hiddens
+    function setVar($variable,$value){
+        $this->vars[$variable]=$value;
+    }
+
+    function setInserirClassCss($op) {
+        $this->inserirClassCSS = $op;
+    }
+
+    function generate()
+    {
+        $i=FALSE;
+        $tbnHiddens = new ToolButton();
+        $frmName="";
+        if ($this->formName=="") {
+            for($i=1;$i<=10;$i++){
+                $frmName .= chr(rand(70,80));
+            }
+            $this->formName = $frmName;
+        }
+        if ($this->btName=="") {
+            $this->btName = 'bt';
+        }
+        if ($this->btValue=="") {
+            $this->btValue='Voltar';
+        }
+        $tableIni = "";
+        $tableFin = "" ;
+        if ($this->align!="") {
+            $tableIni = "<table align=$this->align border=0 width=1 height=1><tr><td";
+            if ( $this->inserirClassCSS == true ) {
+                $tableIni .= " class=cadastro";
+            } else {
+                $tableIni .= " class=mostraCorFundo";
+            }
+            $tableIni .= ">";
+            $tableFin = "</td></tr></table>";
+        }
+        $tbnHiddens->AddButton(new Text($tableIni."<FORM name='$this->formName' method ='post' action=$this->action>"));
+        //Monta os campos Hiddens passados pela função setVar
+        foreach ($this->vars as $variable => $value){
+            $tbnHiddens->AddButton( $this->montaCampoHidden( $variable , $value ) );
+        }
+        if ($this->inserirVariaveisREQUESTS == TRUE) {
+            $this->montarParametrosRequest( $tbnHiddens );
+        }
+        $tbnHiddens->AddButton(new FormButton( $this->btValue , $this->btName , 'submit' ));
+        $tbnHiddens->AddButton(new Text("</form>".$tableFin));
+        $tbnHiddens->generate();
+    }
+    #Monta os campos Hiddens do REQUEST
+    function montarParametrosRequest( &$toolButton ){
+        GLOBAL $_REQUEST;
+        $varRequest = $_REQUEST;
+        foreach ($varRequest as $obj =>$valObj){
+            if ($obj!="PHPSESSID") {
+                $variavel="";
+                $valor="";
+                if (is_array($valObj)) {
+                    $variavel .= $obj;
+                    $array = $valObj;
+                    while(is_array($array)==TRUE){
+                        list($key,$value)=each($array);
+                        $variavel .="[".$key."]";
+                        if (is_array($value)==FALSE) {
+                            $valor = $value;
+                        }
+                        $array = $value;
+                    } // while
+                }else{
+                    $variavel = $obj;
+                    $valor = $valObj;
+                }
+                $toolButton->AddButton($this->montaCampoHidden( $variavel , $valor ) );
+            }
+        }
+    }
+
+    function montaCampoHidden($variavel,$valor){
+        $retorno = new TextHidden('hidden',$variavel,$valor);
+        return $retorno;
+    }
+} //fim classe
+
+# Classe que cria um combo para seleção de Estabelecimentos Permitidos id_usu
+class comboEstabelecimentosPermitidos extends ComboBox {
+    var $descriptor = "function comboEstabelecimentosPermitidos(&\$DB, \$label, \$name, \$value, \$selecione='', \$disable=false, \$js='', \$tipo=[UNI|COL])";
+    var $options;
+
+    function comboEstabelecimentosPermitidos(&$DB, $label, $name, $value, $selecione='', $disable=false, $js='', $tipo='') {
+        GLOBAL $SISCONF;
+        $qry = new genericQuery($DB);
+        /*
+        $SQL = " SELECT E.EST_RAZAO_SOCIAL, E.EST_ID \n"
+                    ." FROM USUARIOXESTABELECIMENTO UE, ESTABELECIMENTO E \n"
+                    ." WHERE UE.EST_ID = E.EST_ID \n"
+                    ." AND UE.USU_ID = ".$SISCONF['SESSAO']['USUARIO']['ID']." \n"
+                    ." ORDER BY E.EST_RAZAO_SOCIAL \n";
+        */
+        $sqlAdicional = "";
+        if (trim($tipo)!='') $sqlAdicional = " AND EST_PARAM_SISTEMA='$tipo' ";
+
+
+        $SQL = " SELECT E.EST_RAZAO_SOCIAL, E.EST_ID \n"
+                    ." FROM USUARIOXESTABELECIMENTO UE, ESTABELECIMENTO E \n"
+                    ." WHERE UE.EST_ID = E.EST_ID \n" . $sqlAdicional
+                    ." AND (UE.USU_ID = ".$SISCONF['SESSAO']['USUARIO']['ID']." \n"
+                    ."      OR UE.USU_ID in (select distinct ug.gru_id \n"
+                    ."                       from usuxgrupos ug\n"
+                    ."                       where ug.usu_id=".$SISCONF['SESSAO']['USUARIO']['ID'].")) \n"
+                    ." ORDER BY E.EST_RAZAO_SOCIAL \n";
+        //echo "<pre>".$SQL."</pre>";
+        $qry->Tquery($SQL);
+        $this->options = array();
+        while($dyn = $qry->fetchrow())  {
+            $this->options["m".$dyn["EST_ID"]] = $dyn["EST_RAZAO_SOCIAL"];
+        }
+        $value = "m".$value;//$label foi deletado
+        $this->ComboBox($label, $name, $value, $this->options, $selecione, $disable, $js);
+    }
+}//comboEstabelecimentosPermitidos
+
+class comboUnidadeProdutoAlmox extends ComboBox{
+    var $descriptor = "function comboUnidadeProdutoAlmox(&\$DB, \$label, \$name, \$estabelecimento, \$value, \$selecione = '')";
+
+    function comboUnidadeProdutoAlmox(&$DB, $label, $name, $estabelecimento, $value, $selecione = ''){
+        GLOBAL $PHP_SELF; //indica que o programa vai retornar os dados para esta página
+
+        $qry = new genericQuery($DB);
+        $sql= "SELECT unpr_id, unpr_descricao ".
+              " FROM unidade_produto ".
+              " where est_id=".$estabelecimento.
+              " ORDER BY unpr_descricao";
+
+        $this->unidadeProdutoAlmox = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+             $this->unidadeProdutoAlmox["u".$row["UNPR_ID"]]=$row["UNPR_DESCRICAO"];
+        }
+
+        $value = "u".$value;
+        $this->ComboBox($label, $name, $value, $this->unidadeProdutoAlmox, $selecione);
+    }//function
+}//class comboUnidadeProdutoAlmox
+
+class comboTipoProdutoAlmox extends ComboBox{
+    var $descriptor = "function comboTipoProdutoAlmox(&\$DB, \$label, \$name, \$estabelecimento, \$value, \$selecione = '')";
+
+    function comboTipoProdutoAlmox(&$DB, $label, $name, $estabelecimento, $value, $selecione = ''){
+        GLOBAL $PHP_SELF; //indica que o programa vai retornar os dados para esta página
+
+        $qry = new genericQuery($DB);
+        $sql= "SELECT tipp_id, tipp_descricao ".
+              " FROM tipo_produto ".
+              " where est_id=". $estabelecimento.
+              " ORDER BY tipp_descricao";
+
+        $this->tipoProdutoAlmox = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+             $this->tipoProdutoAlmox["t".$row["TIPP_ID"]]=$row["TIPP_ID"]." - ".$row["TIPP_DESCRICAO"];
+        }
+
+        $value = "t".$value;
+        $this->ComboBox($label, $name, $value, $this->tipoProdutoAlmox, $selecione);
+    }//function
+}//class comboTipoProdutoAlmox
+
+class combocontaContabil extends ComboBox{
+    var $descriptor = "function combocontaContabil(&\$DB, \$label, \$name, \$estabelecimento, \$value, \$selecione = '')";
+
+    function combocontaContabil(&$DB, $label, $name, $estabelecimento, $value, $selecione = ''){
+        GLOBAL $PHP_SELF; //indica que o programa vai retornar os dados para esta página
+
+        $qry = new genericQuery($DB);
+        $sql= "SELECT MDLC_ID,  MDLC_COD_HIST, MDLC_HISTORICO ".
+              " FROM MODELO_CONTABIL ".
+              " WHERE EST_ID=". $estabelecimento.
+              " ORDER BY MDLC_ID";
+
+        $this->contaContabil = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+            if (trim($row["MDLC_HISTORICO"])!= "") {
+                $this->contaContabil["ct".$row["MDLC_ID"]]=$row["MDLC_ID"]." - ".$row["MDLC_HISTORICO"];
+            }
+        }//while
+
+        $value = "ct".$value;
+        $this->ComboBox($label, $name, $value, $this->contaContabil, $selecione);
+    }//function
+}//class combocontaContabil
+
+class comboTipoLotacaoAcad extends ComboBox {
+    var $descriptor = "function comboTipoLotacaoAcad(&\$DB, \$label, \$name, \$value, \$selecione = '', \$projPesquisa = false)";
+
+    function comboTipoLotacaoAcad(&$DB, $label, $name, $value, $selecione = '', $projPesquisa = false){
+        //se $projPesquisa for verdadeiro, vai retornar somente as opções onde TILA_PROJETO==1
+
+        GLOBAL $PHP_SELF; //indica que o programa vai retornar os dados para esta página
+
+        $qry = new genericQuery($DB);
+        $sql= "SELECT TILA_ID, TILA_DESCRICAO ".
+              " FROM TIPO_LOTACAO_ACAD ".
+              ($projPesquisa==true ? " WHERE TILA_PROJETO = 1" : "").
+              " ORDER BY TILA_ID";
+        $dados = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+            $dados["l".$row["TILA_ID"]] = $row["TILA_ID"]." - ".$row["TILA_DESCRICAO"];
+        }//while
+
+        $value = "l".$value;
+        $this->ComboBox($label, $name, $value, $dados, $selecione);
+    }
+}
+
+class comboProfessores extends ComboBox{
+    var $descriptor = "function comboProfessores(&\$DB, \$label, \$name, \$value, \$selecione = '', \$somenteNormais = false, \$js = '')";
+
+    function comboProfessores(&$DB, $label, $name, $value, $selecione = '', $somenteNormais = false, $js = ''){
+        GLOBAL $PHP_SELF;
+
+        $qry = new genericQuery($DB);
+
+        $adicional = "";
+        $condicao  = "";
+        if ($somenteNormais==false) {
+            $adicional = "||''||DECODE(fun.func_SITUACAO,'0','',' (Afastado)') PES_NOME";
+        }else{
+            $condicao = " and fun.func_situacao = 0 ";
+        }
+
+        $sql= "\n SELECT fun.func_id, P.PES_NOME ".$adicional.
+                "\n FROM funcionario fun, funcionarioxcategoria fc, SUNIDBA.PESSOA P ".
+                "\n WHERE fun.func_id <> 0 ".// professor não definido
+                $condicao.
+                "\n and fc.catf_id = 1 ".
+                "\n and fun.func_id = fc.func_id ".
+                "\n and Fun.PES_ID = P.PES_ID ".
+                "\n ORDER BY P.PES_NOME ";
+        $professores = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+                $professores["p".$row["FUNC_ID"]] = $row["PES_NOME"];
+        }//while
+        $value = "p".$value;
+        $this->ComboBox($label, $name, $value, $professores, $selecione, false, $js);
+    }//function
+    //$this->form->AddField(new comboProfessores($this->conn, 'funcId', 'funcId', $this->funcId, 'Selecione', false/true));
+}//class comboProfessores
+
+class comboFuncionarios extends ComboBox{
+    var $descriptor = "function comboFuncionarios(&\$DB, \$label, \$name, \$value, \$selecione = '', \$categoria = '', \$funcId = true)";
+
+    function comboFuncionarios(&$DB, $label, $name, $value, $selecione = '', $categoria = '', $funcId=true, $todos=true){
+        //$categoria recebe a categoria do funcionário (catf_id da tabela funcionarioxcategoria).
+        GLOBAL $PHP_SELF;
+
+        $tabela = ""; $join = "";
+
+        if ($categoria != ""){
+            $tabela = ", funcionarioxcategoria fc ";
+            $join = " and fc.func_id = f.func_id ".
+                    " and fc.catf_id = ".$categoria;
+        }//if
+
+        $qry = new genericQuery($DB);
+
+        $campoId = 'f.func_id as ID';
+        if ($funcId==false)
+        {
+            $campoId = 'p.pes_id as ID';
+        }
+        $mais = "";
+        if ($todos==false)
+        {
+            $mais = 'and f.func_situacao = 0';
+        }
+
+        $sql= "Select distinct ".$campoId.", p.pes_nome, p.pes_nome||''||decode(f.func_situacao,0,'','&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;::Afastado::') PES_NOME ".
+              " from sunidba.pessoa p, funcionario f ".$tabela.
+              " where f.pes_id = p.pes_id ".$join.
+              $mais.
+              " order by p.pes_nome";
+              //echo"<pre>$sql</pre>";
+        $qry->TQuery($sql);
+
+        $funcionarios = array();
+        while ($row = $qry->fetchrow()) {
+             $funcionarios["f".$row["ID"]] = $row["PES_NOME"];
+        }//while
+
+        $value = "f".$value;
+        $this->ComboBox($label, $name, $value, $funcionarios, $selecione);
+    }//function
+
+    //$this->form->AddField(new comboFuncionarios($this->conn, 'funcId', 'funcId', $this->funcId, 'Selecione'));
+}//class comboFuncionarios
+
+class comboAgenteIntegracao extends ComboBox{
+    var $descriptor = "function comboAgenteIntegracao(&\$DB, \$label, \$name, \$value, \$selecione = '')";
+
+    function comboAgenteIntegracao(&$DB, $label, $name, $value, $selecione = ''){
+        GLOBAL $PHP_SELF;
+
+        $qry = new genericQuery($DB);
+
+        $sql= "Select agin_id AGIN_ID, agin_descricao AGIN_DESCRICAO".
+              " from agente_integrador ".
+              " order by agin_descricao";
+
+        $agenteIntegracao = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+                $agenteIntegracao["a".$row["AGIN_ID"]] = $row["AGIN_DESCRICAO"];
+        }//while
+        $value = "a".$value;
+        $this->ComboBox($label, $name, $value, $agenteIntegracao, $selecione);
+    }//function
+    //$this->form->AddField(new comboFuncionariosSituacaoNormal($this->conn, 'funcId', 'funcId', $this->funcId, 'Selecione'));
+}//class comboAgenteIntegracao
+
+class comboTitulacoes extends ComboBox {
+    var $descriptor = "function comboTitulacoes(&\$DB, \$label, \$name, \$value, \$selecione = \"\")";
+    var $options;
+
+    function comboTitulacoes(&$DB, $label, $name, $value, $selecione = "") {
+        $qry = new genericQuery($DB);
+        $lista = array();
+
+        $sql = "select TTL_ID, TTL_DESCR".
+            " from TITULACAO".
+            " order by TTL_ID";
+        $qry->TQuery($sql);
+
+        while($row = $qry->fetchrow()) {
+            $lista['p'.$row["TTL_ID"]] = $row["TTL_DESCR"];
+        }
+        $this->options = $lista;
+        $this->ComboBox($label, $name, $value, $this->options, $selecione);
+    }
+}//class comboTitulacoes
+
+class comboDisciplinasUni extends ComboBox{
+    var $descriptor = "function comboDisciplinasUni(&\$DB, \$label, \$name, \$value, \$selecione = '', \$semestre, \$curso)";
+
+    function comboDisciplinasUni(&$DB, $label, $name, $value, $selecione = '', $semestre, $curso){
+        //$semestre vem no formato 2004-1-0. Ele é útil para selecionar somente as disciplinas que ocorreram em
+        //determinado semestre, ao invés de mostrar tooodas as disciplinas cadastradas.
+
+        //$curso é o código do curso, da tabela vcurso_uni.
+        //É utill para visualizar as disciplinas de um determinado curso.
+		if($semestre != ""){
+        	list($ano, $sem, $flgInt) = explode("-",$semestre);
+		}
+        $qry = new genericQuery($DB);
+
+        $sql = " select distinct d.dsc_descr||'&nbsp;&nbsp;('||trim(to_char(d.dsc_id,'00000'))||')' DSC, d.DSC_ID ".
+                " from disciplina_uni d, turma_uni t ".
+                " where t.dsc_id = d.dsc_id";
+
+        if ($semestre != "") {
+            $sql .= " and t.sem_ano = ".$ano.
+                    " and t.sem_semestre = ".$sem.
+                    " and t.sem_flg_intensivo = '".$flgInt."'";
+        }//if
+
+        if ($curso != "") {
+            $sql .= " and d.cur_id = ".$curso;
+        }
+
+		$sql .= " order by 1 ";
+        //echo $sql;exit;
+        $qry->TQuery($sql);
+
+        $disciplinas = array();
+        while ($row = $qry->fetchrow()) {
+                $disciplinas["d".$row["DSC_ID"]] = $row["DSC"];
+        }//while
+        $value = "d".$value;
+        $this->ComboBox($label, $name, $value, $disciplinas, $selecione);
+    }//function
+
+    //$this->form->AddField(new comboDisciplinas($this->conn, 'funcId', 'funcId', $this->funcId, 'Selecione'));
+}//class class comboDisciplinas
+
+class comboCategoriaFuncionario extends ComboBox{
+    var $descriptor = "function comboCategoriaFuncionario(&\$DB, \$label, \$name, \$value, \$selecione = '')";
+
+    function comboCategoriaFuncionario(&$DB, $label, $name, $value, $selecione = ''){
+        GLOBAL $PHP_SELF;
+
+        $qry = new genericQuery($DB);
+
+        $sql= "SELECT CF.CATF_DESCRICAO, CF.CATF_ID ".
+              " FROM CATEGORIA_FUNCIONARIO CF ".
+              " ORDER BY CF.CATF_ID, CF.CATF_DESCRICAO DESC";
+
+        $categorias = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+                $categorias["c".$row["CATF_ID"]] = $row["CATF_DESCRICAO"];
+        }//while
+        $value = "c".$value;
+        $this->ComboBox($label, $name, $value, $categorias, $selecione);
+    }//function
+//$this->form->AddField(new comboCategoriaFuncionario($this->conn, 'catfId', 'catfId', $this->catfId, 'Selecione'));
+}//class comboCategoriaFuncionario
+
+class comboBeneficios extends ComboBox{
+    var $descriptor = "function comboBeneficios(&\$DB, \$label, \$name, \$value, \$selecione = '', \$disable = false, \$js = '', \$tirarFinanc = false, \$somenteBenefAtivos = false)";
+
+    //function comboBeneficios(&$DB, $label, $name, $value, $selecione = '', $disable = false, $js = '', $tirarFinanc = false){
+    function comboBeneficios(&$DB, $label, $name, $value, $selecione = '', $disable = false, $js = '', $tirarFinanc = false, $somenteBenefAtivos=false){
+        GLOBAL $PHP_SELF;
+
+        $qry = new genericQuery($DB);
+
+        ############### Trecho modificado por diegom ######################
+        # Ref.: Chamado Ocomom 26393
+        /*
+        $sql= "SELECT BE.BEN_DESCR, BE.BEN_ID ".
+              " FROM BENEFICIO BE ".
+            ($tirarFinanc?"WHERE BEN_FLG_FINANC != 1":"").
+              " ORDER BY BE.BEN_DESCR";
+        */
+
+        $sql = " select BEN_ID, DECODE(BEN_ATIVO,0,'(Inativo) ','') || "
+                ." DECODE( BEN_FLG_CONDIC, 1, '(Condicional) ', DECODE( BEN_FLG_FINANC, 1, '(Convênio) ', '(Benefício) ') ) "
+               ."\n ||' - '||TO_CHAR(BEN_ID,'00')||' - '||BEN_DESCR BEN_DESCR, BEN_ATIVO "
+               ."\n from beneficio ";
+        $entrou = false;
+        if ($tirarFinanc == FALSE){
+            $sql .= "\n where BEN_FLG_FINANC=0 ";
+            $entrou = true;
+        }
+
+        if ($somenteBenefAtivos==true){
+            if ($entrou) {
+                $sql .= "\n and BEN_ATIVO=1 ";
+            }else{
+                $sql .= "\n where BEN_ATIVO=1 ";
+            }
+        }
+        $sql .= "\n order by 2 ";
+
+        ###################################################################
+
+        $beneficios = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+                $beneficios["b".$row["BEN_ID"]] = $row["BEN_DESCR"];
+        }//while
+        $value = "b".$value;
+        $this->ComboBox($label, $name, $value, $beneficios, $selecione, $disable, $js);
+    }//function
+//$this->form->AddField(new comboBeneficios($this->conn, 'benId', 'benId', $this->benId, 'Selecione'));
+}//class comboBeneficios
+
+class comboPeriodo extends ComboBox{
+    var $descriptor = "function comboPeriodo(&\$DB, \$label, \$name, \$value, \$selecione = '', \$textoPadrao = '', \$disable = false )";
+
+    function comboPeriodo(&$DB, $label, $name, $value, $selecione = '', $textoPadrao = "", $disable = false )
+    {
+        GLOBAL $PHP_SELF;
+
+        $qry = new genericQuery($DB);
+
+        $sql= " select distinct per_periodo ".
+              " from periodo_uni ".
+              " order by per_periodo ";
+
+        $periodo = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow())
+        {
+            $this->options["p".$row["PER_PERIODO"]] = mb_strtoupper($row["PER_PERIODO"]);
+        }
+
+        $value = "p".$value;
+
+        if (!empty($textoPadrao))
+        {
+            $o = current($this->options);
+            if (is_array($o))
+            {
+                $default = array('', $textoPadrao);
+                $this->options = array_merge(array($default), $this->options);
+            }
+            else
+            {
+                $default = array('' => $textoPadrao);
+                $this->options = array_merge($default, $this->options);
+            }
+        }
+        $this->ComboBox($label, $name, $value, $this->options, $selecione, $disable);
+    }
+}
+
+class comboHabilitacao extends ComboBox{
+    var $descriptor = "function comboHabilitacao(&\$DB, \$label, \$name, \$value, \$selecione = '', \$textoPadrao = '', \$disable = false )";
+
+    function comboHabilitacao(&$DB, $label, $name, $value, $selecione = '', $textoPadrao = "", $disable = false )
+    {
+        GLOBAL $PHP_SELF;
+
+        $qry = new genericQuery($DB);
+
+        $sql= " select distinct hab_id ".
+              " from habilitacao ".
+              " order by hab_id ";
+
+        $periodo = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow())
+        {
+            $this->options["h".$row["HAB_ID"]] = mb_strtoupper($row["HAB_ID"]);
+        }
+
+        $value = "h".$value;
+
+        if (!empty($textoPadrao))
+        {
+            $o = current($this->options);
+            if (is_array($o))
+            {
+                $default = array('', $textoPadrao);
+                $this->options = array_merge(array($default), $this->options);
+            }
+            else
+            {
+                $default = array('' => $textoPadrao);
+                $this->options = array_merge($default, $this->options);
+            }
+        }
+        $this->ComboBox($label, $name, $value, $this->options, $selecione, $disable);
+    }
+}//comboHabilitação
+
+class comboPredios extends ComboBox{
+    var $descriptor = "function comboPredios(&\$DB, \$label, \$name, \$value, \$selecione = '', \$estabelecimento = '')";
+
+    function comboPredios(&$DB, $label, $name, $value, $selecione = '', $estabelecimento = ''){
+        GLOBAL $PHP_SELF;
+
+        $qry = new genericQuery($DB);
+
+        $sql = "SELECT P.PRD_ID, P.EST_ID, P.PRD_DESCR, E.EST_NOME_REDUZ ".
+               " FROM PREDIOS P, ESTABELECIMENTO E ".
+               " WHERE P.EST_ID = E.EST_ID ";
+               if (!empty($estabelecimento)) {
+                   $sql .= " AND P.EST_ID = ".$estabelecimento;
+               }
+               $sql .= " ORDER BY TO_NUMBER(PRD_ID)";
+        $predios = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+                $predios["p".$row["PRD_ID"]."*".$row["EST_ID"]] = $row["PRD_DESCR"]." - ".$row["EST_NOME_REDUZ"];
+                //a chave da tabela predios é o prd_id E o est_id, por isso, deve-se levar os dois dados no Id da combo
+        }//while
+        $value = "p".$value;
+        $this->ComboBox($label, $name, $value, $predios, $selecione);
+    }//function
+//$this->form->AddField(new comboPredios($this->conn, 'prdId', 'prdId', $this->prdId, 'Todos os Prédios'));
+}//class comboPredios
+
+class comboSalas extends ComboBox{
+    var $descriptor = "function comboSalas(&\$DB, \$label, \$name, \$value, \$selecione = '', \$estabelecimento = '', \$predio = '')";
+
+    function comboSalas(&$DB, $label, $name, $value, $selecione = '', $estabelecimento = '', $predio = ''){
+        GLOBAL $PHP_SELF;
+
+        $qry = new genericQuery($DB);
+
+        $sql = " select s.sal_id, s.sal_numero, e.est_nome_reduz ".
+                " from sala s, estabelecimento e ".
+                " where s.est_id = e.est_id ";
+                if (!empty($estabelecimento)) {
+                    $sql .= " AND e.est_id = ".$estabelecimento;
+                }
+                if (!empty($predio)) {
+                    list($prd, $est) = explode("*", $predio); //$predio vem no formato 1*2 (predio * estab)
+                    $sql .= " AND s.prd_id = ".$prd;
+                }
+                $sql .= " order by s.sal_numero ";
+        $salas = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+                $salas["s".$row["SAL_ID"]] = $row["SAL_NUMERO"]." - ".$row["EST_NOME_REDUZ"];
+        }//while
+        $value = "s".$value;
+        $this->ComboBox($label, $name, $value, $salas, $selecione);
+    }//function
+//$this->form->AddField(new comboSalas($this->conn, 'salId', 'salId', $this->salId, 'Todas as Salas'));
+}//class comboSalas
+
+class comboTipoProjetoPesquisa extends ComboBox{
+    var $descriptor = "function comboTipoProjetoPesquisa(&\$DB, \$label, \$name, \$value, \$selecione = '')";
+
+    function comboTipoProjetoPesquisa(&$DB, $label, $name, $value, $selecione = ''){
+        GLOBAL $PHP_SELF;
+
+        $qry = new genericQuery($DB);
+
+        $sql= " select * ".
+                " from tipo_projeto_pesquisa ".
+                " order by TPPE_DESCRICAO ";
+        $tipos = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+                $tipos["t".$row["TPPE_ID"]] = $row["TPPE_DESCRICAO"];
+        }//while
+
+        $value = "t".$value;
+        $this->ComboBox($label, $name, $value, $tipos, $selecione);
+    }//function
+//$form->AddField(new comboTipoProjetoPesquisa($this->conn, 'tppeId', 'tppeId', $this->tppeId, ''));
+}//class comboTipoProjetoPesquisa
+
+// classe que monta o combo com a descrição dos Locais de Pagamento (Para o Sistema Financeiro do Colégio e Graduação)
+class comboLocaisPagamento extends ComboBox {
+    var $descriptor = "function comboLocaisPagamento(&\$DB, \$label, \$name, \$value, \$selecione = 'Selecione', \$incluirTodos = false)";
+    var $options;
+
+    function comboLocaisPagamento(&$DB, $label, $name, $value, $selecione = 'Selecione', $incluirTodos = false){
+        $qry = new genericQuery($DB);
+
+        $SQL = "Select LCL_PAG, LCL_LOCAL
+            From CELDBA.LOCAIS
+            Order BY LCL_LOCAL";
+
+        $qry->query($SQL);
+        $this->options = array();
+        if ($incluirTodos != false) $this->options["c0"] = "Todos os Locais";
+        while($dyn = $qry->fetchrow()){
+            $this->options["c".$dyn["LCL_PAG"]] = $dyn["LCL_LOCAL"];
+        }
+
+        $value = "c".$value;
+        $this->ComboBox($label, $name, $value, $this->options, $selecione);
+    }
+}//class comboLocaisPagamento
+
+class comboConveniosSemestre extends ComboBox{
+    var $descriptor = "function comboConveniosSemestre(&\$DB, \$label, \$name, \$value, \$selecione = '')";
+
+    function comboConveniosSemestre(&$DB, $label, $name, $value, $selecione = ''){
+        GLOBAL $PHP_SELF;
+
+        $qry = new genericQuery($DB);
+
+        $sql= " select distinct c.ben_id, b.ben_descr ".
+                " from convenioxsemestre c, beneficio b ".
+                " where c.ben_id = b.ben_id ".
+                " order by b.ben_descr ";
+        $convenios = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+                $convenios["c".$row["BEN_ID"]] = $row["BEN_DESCR"];
+        }//while
+
+        $value = "c".$value;
+        $this->ComboBox($label, $name, $value, $convenios, $selecione);
+    }//function
+//$form->AddField(new comboConveniosSemestre($this->conn, 'benId', 'benId', $this->benId, ''));
+}//class comboConveniosSemestre
+
+class comboEventos extends ComboBox{
+    var $descriptor = "function comboEventos(&\$DB, \$label, \$name, \$value, \$selecione = '')";
+
+    function comboEventos(&$DB, $label, $name, $value, $selecione = ''){
+        GLOBAL $PHP_SELF;
+
+        $qry = new genericQuery($DB);
+
+        $sql= " select EVTO_ID||'*'||EDEV_ID ID, EDEV_DESCRICAO ".
+                " from  EDICAO_EVENTO ".
+                " order by EVTO_ID ";
+        $eventos = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+                $eventos["e".$row["ID"]] = $row["EDEV_DESCRICAO"];
+        }//while
+
+        $value = "e".$value;
+        $this->ComboBox($label, $name, $value, $eventos, $selecione);
+    }//function
+//$form->AddField(new comboEventos($this->conn, 'evtoId', 'evtoId', $this->evtoId, ''));
+}//class comboEventos
+
+class comboAtividadesEventos extends ComboBox{
+    var $descriptor = "function comboAtividadesEventos(&\$DB, \$label, \$name, \$value, \$selecione = '', \$eventoId = '', \$edicaoEventoId = '')";
+
+    function comboAtividadesEventos(&$DB, $label, $name, $value, $selecione = '', $eventoId = '', $edicaoEventoId = ''){
+        GLOBAL $PHP_SELF;
+
+        $qry = new genericQuery($DB);
+
+        $sql= " select EVAT_ID, EVAT_TITULO ".
+                " from EVENTO_ATIVIDADES ";
+                if (($eventoId != "") and ($edicaoEventoId)) {
+                    $sql .= " WHERE EVTO_ID = ".$eventoId.
+                            " AND EDEV_ID = ".$edicaoEventoId;
+                }
+                $sql .= " order by EVAT_TITULO ";
+        $atividades = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+                $atividades["a".$row["EVAT_ID"]] = $row["EVAT_TITULO"];
+        }//while
+
+        $value = "a".$value;
+        $this->ComboBox($label, $name, $value, $atividades, $selecione);
+    }//function
+//$form->AddField(new comboAtividadesEventos($this->conn, 'evatId', 'evatId', $this->evatId, '', $eventoId, $edicaoEventoId));
+}//class comboAtividadesEventos
+
+class comboSituacaoDocs extends ComboBox{
+    var $descriptor = "function comboSituacaoDocs(&\$DB, \$label, \$name, \$value, \$selecione = '', \$disable=false, \$js='')";
+
+    function comboSituacaoDocs(&$DB, $label, $name, $value, $selecione = '', $disable=false, $js=''){
+        GLOBAL $PHP_SELF;
+
+        $qry = new genericQuery($DB);
+
+        $sql= " select DOC_STATUS, DOC_ST_DESC ".
+                " from DOC_STATUS ".
+                " order by DOC_ST_ORDEM ";
+        $situacao = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+                $situacao["s".$row["DOC_STATUS"]] = $row["DOC_ST_DESC"]." (".$row["DOC_STATUS"].")";
+        }//while
+
+        $value = "s".$value;
+        $this->ComboBox($label, $name, $value, $situacao, $selecione, $disable, $js);
+    }//function
+//$form->AddField(new comboSituacaoDocs($this->conn, 'docStatus', 'docStatus', $this->docStatus, ''));
+}//class comboSituacaoDocs
+
+class comboTipoVinculoProfessor extends ComboBox{
+    var $descriptor = "function comboTipoVinculoProfessor(&\$DB, \$label, \$name, \$value, \$selecione = '')";
+
+    function comboTipoVinculoProfessor(&$DB, $label, $name, $value, $selecione = ''){
+        GLOBAL $PHP_SELF;
+
+        $qry = new genericQuery($DB);
+
+        $sql= " select TPVI_ID, TPVI_DESCRICAO ".
+                " from TIPO_VINCULO_PROFESSOR ".
+                " order by TPVI_DESCRICAO ";
+        $vinculos = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+                $vinculos["v".$row["TPVI_ID"]] = $row["TPVI_DESCRICAO"];
+        }//while
+
+        $value = "v".$value;
+        $this->ComboBox($label, $name, $value, $vinculos, $selecione);
+    }//function
+//$form->AddField(new comboTipoVinculoProfessor($this->conn, 'tpviId', 'tpviId', $this->tpviId, ''));
+}//class comboTipoVinculoProfessor
+
+class comboRegimeTrabalho extends ComboBox{
+    var $descriptor = "function comboRegimeTrabalho(&\$DB, \$label, \$name, \$value, \$selecione = '')";
+
+    function comboRegimeTrabalho(&$DB, $label, $name, $value, $selecione = ''){
+        GLOBAL $PHP_SELF;
+
+        $qry = new genericQuery($DB);
+
+        $sql= " select RETR_ID, RETR_DESCRICAO  ".
+                " from REGIME_TRABALHO_PROFESSOR ".
+                " order by RETR_DESCRICAO  ";
+        //echo $sql;
+        $regimes = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+                $regimes["r".$row["RETR_ID"]] = $row["RETR_DESCRICAO"];
+        }//while
+
+        $value = "r".$value;
+        $this->ComboBox($label, $name, $value, $regimes, $selecione);
+    }//function
+//$form->AddField(new comboRegimeTrabalho($this->conn, 'retrId', 'retrId', $this->retrId, ''));
+}//class comboRegimeTrabalho
+
+
+class comboAno extends ComboBox{
+    var $descriptor = "function comboAno(&\$DB, \$label, \$name, \$value, \$selecione = '')";
+
+    function comboAno(&$DB, $label, $name, $value, $selecione = ''){
+        GLOBAL $PHP_SELF;
+
+        $qry = new genericQuery($DB);
+
+        $sql= " Select distinct mat_ano ".
+                " from matriculados ".
+                " Order by mat_ano desc ";
+        //echo $sql;
+        $anos = array();
+        $qry->TQuery($sql);
+
+        while ($row = $qry->fetchrow()) {
+                $anos["a".$row["MAT_ANO"]] = $row["MAT_ANO"];
+        }//while
+
+        $value = "r".$value;
+        $this->ComboBox($label, $name, $value, $anos, $selecione);
+    }//function
+//$form->AddField(new comboAno($this->conn, 'ano', 'ano', $this->ano, ''));
+}//class comboAno
+
+class comboRubrica extends comboBox {
+    var $descriptor = "function comboAno(&\$DB, \$label, \$name, \$value, \$selecione = '')";
+
+    function comboRubrica(&$DB, $label, $name, $value, $selecione = ''){
+        GLOBAL $PHP_SELF;
+
+        $rubricas = new negRubricas($DB, array());
+        $dados = $rubricas->buscaRubricasUniParaCombo();
+
+        $value = "x".$value;
+        $this->ComboBox($label, $name, $value, $dados, $selecione);
+    }
+}
+
+class comboLocaisCobranca extends ComboBox {
+    var $descriptor = "function comboLocaisCobranca(&\$DB, \$label, \$name, \$value, \$selecione = 'Selecione', \$incluirTodos = false, \$js = '')";
+    var $options;
+
+    function comboLocaisCobranca(&$DB, $label, $name, $value, $selecione = 'Selecione', $incluirTodos = false, $js = ''){
+        $qry = new genericQuery($DB);
+
+        $SQL = "SELECT LCB_ID, LCB_DESC FROM LOCAL_COBRANCA ORDER BY LCB_ID";
+
+        $qry->query($SQL);
+        $this->options = array();
+        if ($incluirTodos != false) $this->options["c0"] = "Todos os Locais";
+        while($dyn = $qry->fetchrow()){
+            $this->options["c".$dyn["LCB_ID"]] = $dyn["LCB_DESC"];
+        }
+
+        $value = "c".$value;
+        $this->ComboBox($label, $name, $value, $this->options, $selecione, $incluirTodos, $js);
+    }
+}//class comboLocaisCobranca
+
+class comboSituacaoTitulo extends ComboBox {
+    var $descriptor = "function comboSituacaoTitulo(&\$DB, \$label, \$name, \$value, \$selecione = 'Selecione', \$incluirTodos = false)";
+    var $options;
+
+    function comboSituacaoTitulo(&$DB, $label, $name, $value, $selecione = 'Selecione', $incluirTodos = false){
+        $qry = new genericQuery($DB);
+
+        $SQL = "SELECT STT_ID, STT_DESCR ".
+               "FROM SITUACAO_TITULO ".
+               "ORDER BY STT_ID ";
+
+        $qry->query($SQL);
+        $this->options = array();
+        if ($incluirTodos != false) $this->options["c0"] = "Todas as situaçoes";
+        while($dyn = $qry->fetchrow()){
+            $this->options["c".$dyn["STT_ID"]] = $dyn["STT_DESCR"];
+        }
+
+        $value = "c".$value;
+        $this->ComboBox($label, $name, $value, $this->options, $selecione);
+    }
+}//class comboSituacaoTitulo
+
+class comboLocaisRegistro extends ComboBox {
+    var $descriptor = "function comboLocaisRegistro(&\$DB, \$label, \$name, \$value, \$selecione = 'Selecione', \$incluirTodos = false, \$js = '')";
+    var $options;
+
+    function comboLocaisRegistro(&$DB, $label, $name, $value, $selecione = 'Selecione', $incluirTodos = false, $js = ''){
+        $qry = new genericQuery($DB);
+
+        $SQL = "SELECT RGT_ID, RGT_DESCR FROM REGISTRO_TITULO ORDER BY RGT_DESCR";
+
+        $qry->query($SQL);
+        $this->options = array();
+        if ($incluirTodos != false) $this->options["c0"] = "Todos os Locais";
+        while($dyn = $qry->fetchrow()){
+            $this->options["c".$dyn["RGT_ID"]] = $dyn["RGT_DESCR"];
+        }
+
+        $value = "c".$value;
+        $this->ComboBox($label, $name, $value, $this->options, $selecione, $incluirTodos, $js);
+    }
+}//class comboLocaisRegistro
+
+// classe que monta o combo com a situação do aditamento convênios (FIES)
+// Manoel Dais Da Rosa
+// Data: 20/08/2006 
+class comboSituacaoAditamentoConvenio extends ComboBox {
+    var $descriptor = "function comboSituacaoAditamentoConvenio(&\$DB, \$label, \$name, \$value, \$selecione = 'Selecione', \$js = '')";
+    var $options;
+
+    function comboSituacaoAditamentoConvenio(&$DB, $label, $name, $value, $selecione = 'Selecione', $js = ''){
+        $qry = new genericQuery($DB);
+
+        $SQL = "Select STAC_ID, STAC_DESCRICAO
+            From SITUACAO_ADITAMENTO_CONVENIO
+            Order BY STAC_ID";
+
+        $qry->query($SQL);
+        $this->options = array();
+        
+        while($dyn = $qry->fetchrow()){
+            $this->options["c".$dyn["STAC_ID"]] = $dyn["STAC_DESCRICAO"];
+        }
+
+        $value = "c".$value;
+        $this->ComboBox($label, $name, $value, $this->options, $selecione, $js);
+    }
+}//class comboSituacaoAditamentoConvenio
+
+##classe de tela modal
+##Criado Por Eduardo garcia
+class greyBox {
+	
+	##Documentação da classe no servidor https://desenv.unilasalle.edu.br/portal/modulos/script/greybox/normal_usage.html
+	var $descriptor = "funcion greyBox( \$link , \$largura , \$altura , \$titulo) ";
+	
+	/*
+	*	ESSA FUNÇÃO É CHAMADA PELA PACKAGE_SISTEMAS CASO O PARAMETRO $usaGreyBox SEJA SETADO = TRUE
+	*	
+	*/
+	function incluirScript() {
+		GLOBAL $SISCONF;
+		GLOBAL $SGU_INTERNET;
+
+		if ( $SGU_INTERNET == "SGU_INTERNET" ) {
+			$caminhoGrey = $SISCONF['PORTAL_PROF']['SCRIPT']['GREYBOX'];
+		}else{
+			$caminhoGrey = $SISCONF['SIS']['INTRANET']['SCRIPT']['GREYBOX'];
+		}
+		
+		echo "<script type='text/javascript'>
+			var GB_ROOT_DIR = '".$caminhoGrey."';
+			</script>
+			<script type='text/javascript' src='".$caminhoGrey."AJS.js'></script>
+			<script type='text/javascript' src='".$caminhoGrey."AJS_fx.js'></script>
+			<script type='text/javascript' src='".$caminhoGrey."gb_scripts.js'></script>
+			<link href='".$caminhoGrey."gb_styles.css' rel='stylesheet' type='text/css' />";
+	}
+	/*
+	*@Function newGreyBox
+	*@Criado Por: Eduardo Garcia
+	*@description : Esta funcão é responsável pela chamada dos métodos das classes JS responsáveis pela abertura da janela Modal, retorna um html montado conforme os dados informados pelo usuario
+	*@param string $link :Url que será chamada dentro da janela modal
+	*@param numeric $largura: largura da janela
+	*@param numeric $altura: altura da janela
+	*@param string $titulo: texto que irá aparecer quando o mouse se colocar sobre o link
+	*@param string $tipo:Os tipos disponíveis por enquanto são 'pagina' e 'imagem' ou seja se setado pagina, o objeto estará habilitado para abrir uma url(ex;. www.google.com)
+	*se estiver setado imagem ele abrirá no formato para imagens
+	*@acess public
+	*@return string
+	*/
+	function newGreyBox($link , $largura , $altura , $titulo , $tipo='pagina', $parent ='parent.')
+	{
+		GLOBAL $SGU_INTERNET;
+		#$parent = '';
+		if ( $SGU_INTERNET != "SGU_INTERNET" ) {
+			$parent ="";
+		}
+		if($tipo == "pagina"){
+			$html =" <a href='".$link."' onclick=\"return ".$parent."GB_showCenter('', this.href,".$altura.", ".$largura.")\" title='".$titulo."'>";
+		}elseif($tipo=="imagem"	){
+			$html =" <a href='".$link."' onclick=\"return ".$parent."GB_showImage('',this.href)\" title='".$titulo."'>";
+		}	
+		return $html;
+	
+	}
+
+}
+?>

@@ -1,0 +1,19 @@
+<?php 
+// Localização 
+$cidade = 'Maringa';
+ $estado = 'Parana'; 
+ // Estado (sem abreviação!) 
+ $pais = 'Brazil'; 
+ $idioma = 'pt-br';
+ // URL principal da API 
+ $googleWeather = 'http://www.google.com/ig/api'; ?> 
+
+<h2>Previsão do Tempo - <?php echo date('d/m/Y', strtotime($info[0]->forecast_date['data'])); ?>
+</h2> <p>Cidade: <?php echo $info[0]->city['data']; ?>
+</p> <h3>Previsão Atual</h3> 
+<table> <tr> <td><img src="http://www.google.com<?php echo $atual[0]->icon['data']; ?>" alt="weather" />
+</td> <td><?php echo $atual[0]->temp_c['data']; ?>° C<br /><?php echo $atual[0]->condition['data']; ?>
+</td> </tr> </table> <h3>Próximos dias</h3> <table> <?php foreach ($proximos AS $item) { ?> 
+<tr> <td><?php echo $item->day_of_week['data'];?></td> <td>weatherlow['data']; ?>/<?php echo $item->high['data']; ?>° C<br />
+<?php echo $item->condition['data']; ?></td> </tr> <?php } ?> 
+</table> 
