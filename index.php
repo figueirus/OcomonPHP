@@ -6,7 +6,7 @@ is_file( "./includes/config.inc.php" )
 
 	session_start();
 	//session_destroy();
-	// dump($_SESSION);
+	//dump($_SESSION);
 
 	if (!isset($_SESSION['s_language']))  $_SESSION['s_language']= "pt_BR.php";
 	if (!isset($_SESSION['s_nome']))  $_SESSION['s_nome']= "";
